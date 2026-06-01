@@ -1,9 +1,9 @@
-import { verifyPolicy } from '../src/policy';
-import type { ActionInputs, PullRequest, PullRequestCommit } from '../src/types';
+import { verifyPolicy } from '../../src/policy';
+import type { ActionInputs, PullRequest, PullRequestCommit } from '../../src/types';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const fixturesDir = path.join(__dirname, '..', '__fixtures__');
+const fixturesDir = path.join(__dirname, '..', '..', '__fixtures__');
 
 function loadFixture<T>(name: string): T {
   return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), 'utf-8')) as T;
