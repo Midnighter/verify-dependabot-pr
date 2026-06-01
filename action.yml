@@ -1,0 +1,70 @@
+name: Verify Dependabot PR
+description: >
+  Securely verify that a pull request is genuinely authored by Dependabot
+  by checking PR author identity, numeric account ID, and commit verification.
+author: Midnighter
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  github-token:
+    description: GitHub token for API access.
+    default: ${{ github.token }}
+    required: false
+  pr-number:
+    description: PR number to verify.
+    default: ${{ github.event.pull_request.number }}
+    required: false
+  expected-login:
+    description: Expected PR author login.
+    default: dependabot[bot]
+    required: false
+  expected-id:
+    description: Expected PR author numeric account ID.
+    default: "49699333"
+    required: false
+  require-verified-commits:
+    description: Fail if any commit lacks a verified signature.
+    default: "true"
+    required: false
+  require-same-repo:
+    description: Fail if the PR head is from a fork.
+    default: "true"
+    required: false
+  fail-on-missing-author-metadata:
+    description: Fail if commit author/committer login metadata is null.
+    default: "true"
+    required: false
+  require-committer-login-match:
+    description: >
+      Require commit committer login to equal expected-login or appear in
+      allowed-committer-logins. Default false because GitHub's web-flow bot
+      is the committer on Dependabot PRs.
+    default: "false"
+    required: false
+  allowed-committer-logins:
+    description: >
+      Comma-separated logins accepted as valid committers alongside
+      expected-login (only relevant when require-committer-login-match is true).
+    default: "web-flow"
+    required: false
+  github-api-url:
+    description: >
+      GitHub REST API base URL. Override for GitHub Enterprise Server,
+      e.g. https://ghes.example.com/api/v3. Defaults to github.api_url.
+    default: ${{ github.api_url }}
+    required: false
+
+outputs:
+  verified:
+    description: "true if all checks passed, false otherwise."
+  reason:
+    description: Human-readable failure reason (empty on success).
+  checked-commit-count:
+    description: Number of commits inspected.
+
+runs:
+  using: node24
+  main: dist/index.js

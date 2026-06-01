@@ -1,0 +1,17 @@
+[
+  {
+    "sha": "abc123",
+    "commit": {
+      "message": "Bump lodash from 4.17.20 to 4.17.21",
+      "verification": {
+        "verified": true,
+        "reason": "valid"
+      }
+    },
+    "author": null,
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447
+    }
+  }
+]
