@@ -1,0 +1,38 @@
+[
+  {
+    "sha": "abc123",
+    "commit": {
+      "message": "Bump lodash from 4.17.20 to 4.17.21",
+      "verification": {
+        "verified": true,
+        "reason": "valid"
+      }
+    },
+    "author": {
+      "login": "dependabot[bot]",
+      "id": 49699333
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447
+    }
+  },
+  {
+    "sha": "def456",
+    "commit": {
+      "message": "Bump axios from 0.21.1 to 0.21.4",
+      "verification": {
+        "verified": true,
+        "reason": "valid"
+      }
+    },
+    "author": {
+      "login": "dependabot[bot]",
+      "id": 49699333
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447
+    }
+  }
+]

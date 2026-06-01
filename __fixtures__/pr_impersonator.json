@@ -1,0 +1,18 @@
+{
+  "number": 44,
+  "user": {
+    "login": "dependabot[bot]",
+    "id": 99999999,
+    "type": "Bot"
+  },
+  "head": {
+    "repo": {
+      "full_name": "owner/repo"
+    }
+  },
+  "base": {
+    "repo": {
+      "full_name": "owner/repo"
+    }
+  }
+}
