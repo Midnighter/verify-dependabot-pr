@@ -1,11 +1,11 @@
-import { createClient, fetchAllCommits, fetchPullRequest } from '../src/github';
+import { createClient, fetchAllCommits, fetchPullRequest } from '../../src/github';
 import * as core from '@actions/core';
 import { getOctokit } from '@actions/github';
-import type { PullRequest, PullRequestCommit } from '../src/types';
+import type { PullRequest, PullRequestCommit } from '../../src/types';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const fixturesDir = path.join(__dirname, '..', '__fixtures__');
+const fixturesDir = path.join(__dirname, '..', '..', '__fixtures__');
 
 function loadFixture<T>(name: string): T {
   return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), 'utf-8')) as T;

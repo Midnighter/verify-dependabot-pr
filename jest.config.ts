@@ -1,9 +1,31 @@
 import type { Config } from 'jest';
 
+const shared = {
+  preset: 'ts-jest' as const,
+  testEnvironment: 'node' as const,
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
+  moduleNameMapper: {
+    '^@actions/core$': '<rootDir>/tests/__mocks__/@actions/core.ts',
+    '^@actions/github$': '<rootDir>/tests/__mocks__/@actions/github.ts',
+    '^@octokit/plugin-retry$': '<rootDir>/tests/__mocks__/@octokit/plugin-retry.ts',
+  },
+};
+
 const config: Config = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  testMatch: ['**/tests/**/*.test.ts'],
+  projects: [
+    {
+      ...shared,
+      displayName: 'unit',
+      testMatch: ['<rootDir>/tests/unit/**/*.test.ts'],
+    },
+    {
+      ...shared,
+      displayName: 'acceptance',
+      testMatch: ['<rootDir>/tests/acceptance/**/*.steps.ts'],
+    },
+  ],
   collectCoverageFrom: ['src/**/*.ts'],
   coverageThreshold: {
     global: {
@@ -12,14 +34,6 @@ const config: Config = {
       lines: 100,
       statements: 100,
     },
-  },
-  transform: {
-    '^.+\\.ts$': 'ts-jest',
-  },
-  moduleNameMapper: {
-    '^@actions/core$': '<rootDir>/tests/__mocks__/@actions/core.ts',
-    '^@actions/github$': '<rootDir>/tests/__mocks__/@actions/github.ts',
-    '^@octokit/plugin-retry$': '<rootDir>/tests/__mocks__/@octokit/plugin-retry.ts',
   },
 };
 
