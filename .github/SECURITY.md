@@ -13,7 +13,7 @@ to the maintainers until a fix is published.
 
 ### Alternative method
 
-Send an email to [moritz.beber@gmail.com](mailto:moritz.beber@gmail.com) with:
+Send an email to [midnighter@posteo.net](mailto:midnighter@posteo.net) with:
 
 - A description of the vulnerability
 - Steps to reproduce
@@ -22,7 +22,7 @@ Send an email to [moritz.beber@gmail.com](mailto:moritz.beber@gmail.com) with:
 
 ## Response Timeline
 
-- **Acknowledgement:** Within 48 hours of receiving the report.
+- **Acknowledgement:** Within 72 hours of receiving the report.
 - **Initial assessment:** Within 7 days.
 - **Fix or mitigation:** Best effort within 30 days, depending on severity.
 
@@ -43,6 +43,4 @@ For this action, security issues include:
 
 ## Supported Versions
 
-Only the latest major version (`v1`) receives security updates. Pin to the
-major tag (e.g., `Midnighter/verify-dependabot-pr@v1`) to receive patches
-automatically.
+Only the latest major version (`v1`) receives security updates.
