@@ -16,7 +16,16 @@ result.
 
 ## Quickstart
 
-This Action is intended to be used for auto-merging Dependabot pull requests. For the below workflow to succeed, you must [enable auto-merging](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request#enabling-auto-merge) on your repository. Additionally, you need to [allow GitHub Actions to create and approve pull requests](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests).
+This Action is intended to be used for auto-merging Dependabot pull requests.
+For the below workflow to succeed, you must [enable
+auto-merging](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request#enabling-auto-merge)
+on your repository. Additionally, you need to [allow GitHub Actions to create
+and approve pull
+requests](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests).
+Very likely, you will also want to enable branch protection rules and [require
+status
+checks](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging)
+to pass before merging.
 
 Add the following step to a workflow that runs on `pull_request` events. The
 action uses the built-in `GITHUB_TOKEN` and the current PR number by default, so
