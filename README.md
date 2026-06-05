@@ -53,7 +53,7 @@ jobs:
     steps:
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
@@ -78,26 +78,26 @@ jobs:
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `github-token` | No | `${{ github.token }}` | GitHub token used for REST API calls. |
-| `pr-number` | No | `${{ github.event.pull_request.number }}` | Number of the pull request to verify. |
-| `expected-login` | No | `dependabot[bot]` | Expected PR author login. Override when using a self-hosted Dependabot instance. |
-| `expected-id` | No | `49699333` | Expected PR author numeric account ID. This ID is stable and cannot be reassigned, making it a stronger identity check than the login alone. |
-| `require-verified-commits` | No | `true` | Fail if any commit in the PR lacks a verified GPG/SSH signature. |
-| `require-same-repo` | No | `true` | Fail if the PR head branch originates from a fork rather than the base repository. Set to `false` for organisations that allow Dependabot to open PRs from forks. |
-| `fail-on-missing-author-metadata` | No | `true` | Fail if any commit is missing author or committer login metadata. This can indicate that a commit was pushed by a deleted account or via the API without identity context. |
-| `require-committer-login-match` | No | `false` | Require every commit's committer login to equal `expected-login` or appear in `allowed-committer-logins`. Defaults to `false` because GitHub's `web-flow` bot is the recorded committer on Dependabot commits, not Dependabot itself. |
-| `allowed-committer-logins` | No | `web-flow` | Comma-separated list of logins accepted as valid committers in addition to `expected-login`. Only evaluated when `require-committer-login-match` is `true`. |
-| `github-api-url` | No | `${{ github.api_url }}` | GitHub REST API base URL. Override this for GitHub Enterprise Server (GHES) deployments, e.g. `https://ghes.example.com/api/v3`. |
+| Input                             | Required | Default                                   | Description                                                                                                                                                                                                                           |
+| --------------------------------- | -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token`                    | No       | `${{ github.token }}`                     | GitHub token used for REST API calls.                                                                                                                                                                                                 |
+| `pr-number`                       | No       | `${{ github.event.pull_request.number }}` | Number of the pull request to verify.                                                                                                                                                                                                 |
+| `expected-login`                  | No       | `dependabot[bot]`                         | Expected PR author login. Override when using a self-hosted Dependabot instance.                                                                                                                                                      |
+| `expected-id`                     | No       | `49699333`                                | Expected PR author numeric account ID. This ID is stable and cannot be reassigned, making it a stronger identity check than the login alone.                                                                                          |
+| `require-verified-commits`        | No       | `true`                                    | Fail if any commit in the PR lacks a verified GPG/SSH signature.                                                                                                                                                                      |
+| `require-same-repo`               | No       | `true`                                    | Fail if the PR head branch originates from a fork rather than the base repository. Set to `false` for organisations that allow Dependabot to open PRs from forks.                                                                     |
+| `fail-on-missing-author-metadata` | No       | `true`                                    | Fail if any commit is missing author or committer login metadata. This can indicate that a commit was pushed by a deleted account or via the API without identity context.                                                            |
+| `require-committer-login-match`   | No       | `false`                                   | Require every commit's committer login to equal `expected-login` or appear in `allowed-committer-logins`. Defaults to `false` because GitHub's `web-flow` bot is the recorded committer on Dependabot commits, not Dependabot itself. |
+| `allowed-committer-logins`        | No       | `web-flow`                                | Comma-separated list of logins accepted as valid committers in addition to `expected-login`. Only evaluated when `require-committer-login-match` is `true`.                                                                           |
+| `github-api-url`                  | No       | `${{ github.api_url }}`                   | GitHub REST API base URL. Override this for GitHub Enterprise Server (GHES) deployments, e.g. `https://ghes.example.com/api/v3`.                                                                                                      |
 
 ## Outputs
 
-| Output | Description |
-|---|---|
-| `verified` | `"true"` if all checks passed; `"false"` otherwise. |
-| `reason` | Human-readable failure reason. Empty string on success. |
-| `checked-commit-count` | Number of commits inspected across all pages. |
+| Output                 | Description                                             |
+| ---------------------- | ------------------------------------------------------- |
+| `verified`             | `"true"` if all checks passed; `"false"` otherwise.     |
+| `reason`               | Human-readable failure reason. Empty string on success. |
+| `checked-commit-count` | Number of commits inspected across all pages.           |
 
 ## Advanced examples
 
@@ -171,8 +171,8 @@ permissions are required.
 
 ```yaml
 permissions:
-  contents: read       # Read commits on the PR head branch.
-  pull-requests: read  # Read PR author metadata.
+  contents: read # Read commits on the PR head branch.
+  pull-requests: read # Read PR author metadata.
 ```
 
 If your repository or organisation enforces a restrictive default permissions
@@ -197,15 +197,15 @@ and add the job as a required workflow under **Require workflows to pass**.
 
 This action is designed to prevent the following attack scenarios:
 
-| Scenario | Mitigated? | How |
-|---|---|---|
-| Human pushes a PR pretending to be Dependabot by username | Yes | Numeric account ID (`expected-id`) cannot be spoofed by a different account. |
-| Attacker creates a bot account named `dependabot` | Yes | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts. |
-| Fork PR with a rewritten author field | Yes | `require-same-repo` blocks PRs from forks by default. |
-| Commit pushed without a GitHub-issued signature | Yes | `require-verified-commits` rejects unsigned or self-signed commits. |
-| Deleted or anonymous committer in commit metadata | Yes | `fail-on-missing-author-metadata` rejects commits with null login fields. |
-| Pagination bypass — malicious commit on page 2+ | Yes | All commit pages are fetched and checked. |
-| Transient API failure causes a false pass | Yes | Exponential backoff retry; failures surface as errors, not silent passes. |
+| Scenario                                                  | Mitigated? | How                                                                          |
+| --------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
+| Human pushes a PR pretending to be Dependabot by username | Yes        | Numeric account ID (`expected-id`) cannot be spoofed by a different account. |
+| Attacker creates a bot account named `dependabot`         | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.      |
+| Fork PR with a rewritten author field                     | Yes        | `require-same-repo` blocks PRs from forks by default.                        |
+| Commit pushed without a GitHub-issued signature           | Yes        | `require-verified-commits` rejects unsigned or self-signed commits.          |
+| Deleted or anonymous committer in commit metadata         | Yes        | `fail-on-missing-author-metadata` rejects commits with null login fields.    |
+| Pagination bypass — malicious commit on page 2+           | Yes        | All commit pages are fetched and checked.                                    |
+| Transient API failure causes a false pass                 | Yes        | Exponential backoff retry; failures surface as errors, not silent passes.    |
 
 This action does **not** protect against:
 
@@ -219,13 +219,13 @@ This action does **not** protect against:
 
 Check the `reason` output for the specific failure. Common causes:
 
-- *Commit signature verification failed* — The commit was rebased or amended
+- _Commit signature verification failed_ — The commit was rebased or amended
   outside of Dependabot, breaking the signature. Close and let Dependabot
   reopen the PR.
-- *PR head is from a fork* — Your repository has `require-same-repo: true`
+- _PR head is from a fork_ — Your repository has `require-same-repo: true`
   (default) but Dependabot is configured to open from a fork. Set
   `require-same-repo: "false"` or reconfigure Dependabot.
-- *Author ID mismatch* — The `expected-id` input was overridden and does not
+- _Author ID mismatch_ — The `expected-id` input was overridden and does not
   match the actual Dependabot account ID (`49699333`). Restore the default or
   use the correct ID for your GHES instance.
 
