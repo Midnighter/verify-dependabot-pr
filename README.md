@@ -21,10 +21,11 @@ action uses the built-in `GITHUB_TOKEN` and the current PR number by default, so
 no extra configuration is required for the common case.
 
 ```yaml
-name: Merge Dependabot PR
+name: Auto-Merge Dependabot PR
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [main]
 
 permissions:
@@ -35,19 +36,44 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     # Only run for Dependabot PRs — avoids wasting API quota on human PRs.
     if: github.actor == 'dependabot[bot]'
     steps:
       - name: Verify Dependabot PR
         id: verify
-        uses: Midnighter/verify-dependabot-pr@v1
+        uses: Midnighter/verify-dependabot-pr@adb48bae98dc18bc45a5e6234f6ed37aba6243d0
 
-      - name: Require verification
-        if: steps.verify.outputs.verified != 'true'
-        run: |
-          echo "Verification failed: ${{ steps.verify.outputs.reason }}"
-          exit 1
+  merge:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-slim
+    needs: [verify]
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Enable auto-merge for Dependabot PRs
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve PR
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Inputs
