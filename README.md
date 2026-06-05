@@ -29,10 +29,12 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     # Only run for Dependabot PRs — avoids wasting API quota on human PRs.
     if: github.actor == 'dependabot[bot]'
@@ -187,7 +189,7 @@ This action does **not** protect against:
 
 ## Troubleshooting
 
-**`verified` is `false` but the PR looks legitimate**
+### `verified` is `false` but the PR looks legitimate
 
 Check the `reason` output for the specific failure. Common causes:
 
@@ -201,18 +203,18 @@ Check the `reason` output for the specific failure. Common causes:
   match the actual Dependabot account ID (`49699333`). Restore the default or
   use the correct ID for your GHES instance.
 
-**The action fails with an API rate-limit error**
+### The action fails with an API rate-limit error
 
 Pass a token with higher rate limits via the `github-token` input, or ensure
 the workflow does not run too frequently.
 
-**The action fails on GitHub Enterprise Server**
+### The action fails on GitHub Enterprise Server
 
 Set `github-api-url` to your GHES REST API base URL
 (`https://<hostname>/api/v3`). Ensure the token has `repo` scope on the GHES
 instance.
 
-**`checked-commit-count` is `0`**
+### `checked-commit-count` is `0`
 
 The PR has no commits (e.g. the PR number is incorrect or the PR is a draft
 with no pushes). Verify that `pr-number` resolves to a valid, non-empty PR.
