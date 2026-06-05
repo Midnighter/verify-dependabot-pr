@@ -16,6 +16,8 @@ result.
 
 ## Quickstart
 
+This Action is intended to be used for auto-merging Dependabot pull requests. For the below workflow to succeed, you must [enable auto-merging](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request#enabling-auto-merge) on your repository. Additionally, you need to [allow GitHub Actions to create and approve pull requests](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#preventing-github-actions-from-creating-or-approving-pull-requests).
+
 Add the following step to a workflow that runs on `pull_request` events. The
 action uses the built-in `GITHUB_TOKEN` and the current PR number by default, so
 no extra configuration is required for the common case.
@@ -42,7 +44,7 @@ jobs:
     steps:
       - name: Verify Dependabot PR
         id: verify
-        uses: Midnighter/verify-dependabot-pr@adb48bae98dc18bc45a5e6234f6ed37aba6243d0
+        uses: Midnighter/verify-dependabot-pr@4cba4d52b24bed45b73b95d92297594694e21ac8 # v0.2.0
 
   merge:
     permissions:
