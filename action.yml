@@ -1,7 +1,7 @@
 name: Verify Dependabot PR
 description: >
-  Securely verify that a pull request is genuinely authored by Dependabot
-  by checking PR author identity, numeric account ID, and commit verification.
+  Verify that a pull request is authored by Dependabot by checking author
+  identity, account ID, and commit verification.
 author: Midnighter
 
 branding:
