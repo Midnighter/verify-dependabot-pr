@@ -20,8 +20,9 @@ REPO="${REPO:-Midnighter/verify-dependabot-pr}"
 origin_url="$(git remote get-url origin)"
 if [[ "${origin_url}" != *"${REPO}"* ]]; then
   echo "Error: git remote 'origin' (${origin_url}) does not match --repo ${REPO}" >&2
-  exit 2
+  exit 1
 fi
+
 if [[ $# -eq 0 ]]; then
   echo "Usage: $0 <PR number> [<PR number> ...]" >&2
   exit 2
@@ -79,7 +80,7 @@ for pr in "${PR_NUMBERS[@]}"; do
 
   gh pr review "${pr}" --repo "${REPO}" --approve
 
-  git fetch origin "${branch}" main
+  git fetch origin -- "${branch}" main
 
   if ! git merge-base --is-ancestor origin/main "origin/${branch}"; then
     echo "  skipping PR #${pr}: branch is not a fast-forward of main"
