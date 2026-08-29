@@ -18,8 +18,9 @@ set -euo pipefail
 REPO="${REPO:-Midnighter/verify-dependabot-pr}"
 
 origin_url="$(git remote get-url origin)"
-if [[ "${origin_url}" != *"${REPO}"* ]]; then
-  echo "Error: git remote 'origin' (${origin_url}) does not match --repo ${REPO}" >&2
+origin_repo="$(gh repo view --json nameWithOwner -q .nameWithOwner --repo "${origin_url}")"
+if [[ "${origin_repo}" != "${REPO}" ]]; then
+  echo "Error: git remote 'origin' (${origin_repo}) does not match --repo ${REPO}" >&2
   exit 1
 fi
 
