@@ -15,8 +15,13 @@
 #
 set -euo pipefail
 
-REPO="Midnighter/verify-dependabot-pr"
+REPO="${REPO:-Midnighter/verify-dependabot-pr}"
 
+origin_url="$(git remote get-url origin)"
+if [[ "${origin_url}" != *"${REPO}"* ]]; then
+  echo "Error: git remote 'origin' (${origin_url}) does not match --repo ${REPO}" >&2
+  exit 2
+fi
 if [[ $# -eq 0 ]]; then
   echo "Usage: $0 <PR number> [<PR number> ...]" >&2
   exit 2
@@ -32,7 +37,7 @@ for pr in "${PR_NUMBERS[@]}"; do
   before_sha=$(gh pr view "${pr}" --repo "${REPO}" --json headRefOid --jq '.headRefOid')
   branch=$(gh pr view "${pr}" --repo "${REPO}" --json headRefName --jq '.headRefName')
 
-  git fetch origin "${branch}" main
+  git fetch origin -- "${branch}" main
 
   if git merge-base --is-ancestor origin/main "origin/${branch}"; then
     echo "  branch already up-to-date with main; skipping rebase"
@@ -63,6 +68,12 @@ for pr in "${PR_NUMBERS[@]}"; do
 
   if ! gh pr checks "${pr}" --repo "${REPO}" --required --watch; then
     echo "  skipping PR #${pr}: required checks not passing"
+    continue
+  fi
+
+  current_sha=$(gh pr view "${pr}" --repo "${REPO}" --json headRefOid --jq '.headRefOid')
+  if [[ "${current_sha}" != "${after_sha}" ]]; then
+    echo "  skipping PR #${pr}: PR head changed while waiting for checks (${after_sha:0:7} -> ${current_sha:0:7})"
     continue
   fi
 
