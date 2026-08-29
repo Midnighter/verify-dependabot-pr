@@ -35,8 +35,14 @@ REBASE_POLL=10        # seconds between polls
 for pr in "${PR_NUMBERS[@]}"; do
   echo "== PR #${pr} =="
 
-  before_sha=$(gh pr view "${pr}" --repo "${REPO}" --json headRefOid --jq '.headRefOid')
-  branch=$(gh pr view "${pr}" --repo "${REPO}" --json headRefName --jq '.headRefName')
+pr_data=$(gh api "repos/${REPO}/pulls/${pr}" \
+  --jq '[.head.sha, .head.ref, (.user.id | tostring), .state, .base.ref, .head.repo.full_name] | @tsv')
+IFS=$'\t' read -r before_sha branch author_id state base_ref head_repo <<< "${pr_data}"
+
+if [[ "${author_id}" != "49699333" || "${state}" != "open" || "${base_ref}" != "main" || "${head_repo,,}" != "${REPO,,}" ]]; then
+  echo "  skipping PR #${pr}: not an open, same-repository Dependabot PR targeting main"
+  continue
+fi
 
   git fetch origin -- "${branch}" main
 
