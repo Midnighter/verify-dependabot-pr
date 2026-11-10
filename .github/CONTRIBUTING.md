@@ -42,9 +42,9 @@ npm ci
 ```
 
 The project uses [esbuild](https://esbuild.github.io/) to bundle the TypeScript
-source and all dependencies into a single file at `dist/index.js`. This bundled
-file is committed to the repository so that GitHub Actions can run it without a
-separate install step.
+source and all dependencies into a single file at `dist/index.js`. `dist/` is
+not committed to `main`; the release workflow builds it (see
+[Releasing](#releasing)).
 
 ## Running the full check suite
 
@@ -112,17 +112,21 @@ docs: update README with GHES example
 The short summary line should be in the imperative mood, lowercase, and under
 72 characters.
 
-## Updating dist/ before committing
+## Releasing
 
-The `dist/` directory contains the compiled bundle that GitHub Actions actually
-runs. It **must** be kept in sync with the TypeScript source. The CI workflow
-checks for drift and will fail if `dist/` is out of date.
-
-Always run `npm run build` (or `npm run all`) and commit any changes to `dist/`
-in the same commit as the source changes:
+Push a version tag on `main`:
 
 ```bash
-npm run all
-git add dist/
-git commit -m "chore: rebuild dist"
+git tag 1.2.3
+git push origin 1.2.3
 ```
+
+The release workflow then runs the full check suite, builds `dist/`, commits it
+on top of the tagged commit, moves the tag to that commit, creates the GitHub
+Release, and moves the major version tag (e.g. `1`). The release commit is
+reachable only through the tags, so `main` never contains `dist/`. Afterwards,
+run `git fetch --tags --force` to update your local tag.
+
+To try a release first, push a pre-release tag such as `1.2.3-rc.1`. The
+workflow then marks the GitHub Release as a pre-release and leaves the major
+version tag alone.

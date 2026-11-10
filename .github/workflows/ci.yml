@@ -26,6 +26,3 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
-      - name: Check dist/ drift
-        run: |
-          git diff --exit-code dist/ || (echo "::error::dist/ is out of date. Run 'npm run build' and commit." && exit 1)

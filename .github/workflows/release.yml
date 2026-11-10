@@ -4,30 +4,63 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
+      # Pre-releases, e.g. 1.2.3-rc.1.
+      - '[0-9]+.[0-9]+.[0-9]+-*'
 
 permissions:
   contents: read
 
 jobs:
-  release:
-    permissions:
-      contents: write
+  build:
     runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run all
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          generate_release_notes: true
-      - name: Update major version tag
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    # Holds the write token, so it runs no npm code.
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      # main does not contain dist/, so the tag moves to a signed commit on top
+      # of the pushed one that adds it. See the script for details.
+      - name: Commit dist/ and move the release tag to it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/create_release_commit.sh "${GITHUB_REF_NAME}"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ contains(github.ref_name, '-') }}
         run: |
-          VERSION=${GITHUB_REF_NAME}
-          MAJOR=$(echo "$VERSION" | cut -d. -f1)
-          git tag -f "$MAJOR"
-          git push -f origin "$MAJOR"
+          gh release create "${TAG}" --verify-tag --title "${TAG}" --prerelease="${PRERELEASE}" --generate-notes \
+            --notes "Please see https://github.com/${GH_REPO}/blob/${TAG}/CHANGELOG.md for the full release notes."
+      - name: Update major version tag
+        # Users of the major tag must not get pre-releases.
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          MAJOR="${GITHUB_REF_NAME%%.*}"
+          git fetch --force origin tag "${GITHUB_REF_NAME}"
+          git tag --force "${MAJOR}" "${GITHUB_REF_NAME}"
+          git push --force origin "refs/tags/${MAJOR}"
