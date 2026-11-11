@@ -87,6 +87,14 @@ responses.
 - Prefer `const` over `let`; avoid `var`.
 - Keep functions small and single-purpose.
 
+## GitHub Actions
+
+Workflow actions are referenced by version tag and locked to commit SHAs in
+`.github/workflows/actions.lock`. After adding or changing a `uses:` line, run
+[`gh actions-lock`](https://github.com/github/gh-actions-lock) (install it with
+`gh extension install github/gh-actions-lock`) and commit the updated lockfile.
+CI fails if the lockfile is out of date.
+
 ## Commit message format
 
 Use the conventional commit style:
