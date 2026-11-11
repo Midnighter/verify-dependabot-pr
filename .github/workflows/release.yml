@@ -7,12 +7,14 @@ on:
       # Pre-releases, e.g. 1.2.3-rc.1.
       - '[0-9]+.[0-9]+.[0-9]+-*'
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   build:
     runs-on: ubuntu-slim
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,6 +31,8 @@ jobs:
           name: dist
           path: dist/
           if-no-files-found: error
+          # Only hands the bundle to the release job.
+          retention-days: 1
 
   release:
     # Holds the write token, so it runs no npm code.
@@ -36,6 +40,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-slim
+    timeout-minutes: 10
     steps:
       # The tags are pushed with the persisted credentials.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
