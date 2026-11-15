@@ -67,6 +67,9 @@ npm run test            # Jest unit tests with coverage
 npm run build           # esbuild bundle → dist/
 ```
 
+CI also runs `npm audit --audit-level=high`, which fails on high or critical
+vulnerabilities in any dependency.
+
 ## Testing
 
 Tests live alongside the source in `src/` and use [Jest](https://jestjs.io/)
