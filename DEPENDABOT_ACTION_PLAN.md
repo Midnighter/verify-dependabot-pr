@@ -7,12 +7,12 @@ authored by Dependabot before allowing it to be merged.
 
 ## 1. Product Definition
 
-| Property | Value |
-|---|---|
-| **Goal** | Verify a PR is genuinely Dependabot-authored before merge |
-| **Primary users** | Repos enforcing strict supply-chain / dependency-update controls |
-| **MVP behaviour** | Fail the job unless PR author identity and commit metadata satisfy policy |
-| **Default policy** | Strict and safe-by-default; configurable via inputs |
+| Property            | Value                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| **Goal**            | Verify a PR is genuinely Dependabot-authored before merge                                |
+| **Primary users**   | Repos enforcing strict supply-chain / dependency-update controls                         |
+| **MVP behaviour**   | Fail the job unless PR author identity and commit metadata satisfy policy                |
+| **Default policy**  | Strict and safe-by-default; configurable via inputs                                      |
 | **Threat boundary** | Verifies GitHub identity metadata only — not the safety of the dependency payload itself |
 
 ---
@@ -22,12 +22,14 @@ authored by Dependabot before allowing it to be merged.
 **Chosen form:** JavaScript Action (`node24`)
 
 **Rationale:**
+
 - Cross-platform (Linux, macOS, Windows runners) with no container overhead
 - Clean Octokit-based API calls (no shell injection risk)
 - Easy to unit-test with fixture data
 - Straightforward Marketplace adoption
 
 **Why not a reusable workflow:**
+
 - Reusable workflows require `secrets: inherit` or explicit secret passing — unnecessary friction for consumers
 - An Action can be called as a single step inside any existing job
 - Portability: works in any workflow, not just ones that call a centralised workflow file
@@ -89,16 +91,16 @@ verify-dependabot-pr/                  # standalone public repo
 
 ## 4. Key Dependencies
 
-| Package | Purpose |
-|---|---|
-| `@actions/core` | Set inputs, outputs, log levels, fail the step |
-| `@actions/github` | Authenticated Octokit client, event context |
+| Package                 | Purpose                                                    |
+| ----------------------- | ---------------------------------------------------------- |
+| `@actions/core`         | Set inputs, outputs, log levels, fail the step             |
+| `@actions/github`       | Authenticated Octokit client, event context                |
 | `@octokit/plugin-retry` | Exponential backoff retries on transient GitHub API errors |
-| `esbuild` | Bundle `src/` → single `dist/index.js` at build time |
-| `typescript` | Type safety |
-| `@types/node` | Node type definitions |
-| `jest` + `ts-jest` | Unit testing |
-| `eslint` + plugins | Linting |
+| `esbuild`               | Bundle `src/` → single `dist/index.js` at build time       |
+| `typescript`            | Type safety                                                |
+| `@types/node`           | Node type definitions                                      |
+| `jest` + `ts-jest`      | Unit testing                                               |
+| `eslint` + plugins      | Linting                                                    |
 
 ---
 
@@ -106,26 +108,26 @@ verify-dependabot-pr/                  # standalone public repo
 
 ### Inputs
 
-| Input | Default | Description |
-|---|---|---|
-| `github-token` | `${{ github.token }}` | Token for GitHub API calls |
-| `pr-number` | `${{ github.event.pull_request.number }}` | PR to verify |
-| `expected-login` | `dependabot[bot]` | Required PR author login |
-| `expected-id` | `49699333` | Required PR author numeric account ID |
-| `require-verified-commits` | `true` | Fail if any commit lacks a verified signature |
-| `require-same-repo` | `true` | Fail if PR head is from a fork |
-| `fail-on-missing-author-metadata` | `true` | Fail if commit author/committer login is null |
-| `require-committer-login-match` | `false` | Require commit committer login to equal `expected-login` (see note on web-flow) |
-| `allowed-committer-logins` | `web-flow` | Comma-separated logins accepted as valid committers alongside `expected-login` |
-| `github-api-url` | `${{ github.api_url }}` | GitHub REST API base URL — override for GitHub Enterprise Server (e.g. `https://ghes.example.com/api/v3`) |
+| Input                             | Default                                   | Description                                                                                               |
+| --------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `github-token`                    | `${{ github.token }}`                     | Token for GitHub API calls                                                                                |
+| `pr-number`                       | `${{ github.event.pull_request.number }}` | PR to verify                                                                                              |
+| `expected-login`                  | `dependabot[bot]`                         | Required PR author login                                                                                  |
+| `expected-id`                     | `49699333`                                | Required PR author numeric account ID                                                                     |
+| `require-verified-commits`        | `true`                                    | Fail if any commit lacks a verified signature                                                             |
+| `require-same-repo`               | `true`                                    | Fail if PR head is from a fork                                                                            |
+| `fail-on-missing-author-metadata` | `true`                                    | Fail if commit author/committer login is null                                                             |
+| `require-committer-login-match`   | `false`                                   | Require commit committer login to equal `expected-login` (see note on web-flow)                           |
+| `allowed-committer-logins`        | `web-flow`                                | Comma-separated logins accepted as valid committers alongside `expected-login`                            |
+| `github-api-url`                  | `${{ github.api_url }}`                   | GitHub REST API base URL — override for GitHub Enterprise Server (e.g. `https://ghes.example.com/api/v3`) |
 
 ### Outputs
 
-| Output | Description |
-|---|---|
-| `verified` | `true` or `false` |
-| `reason` | Human-readable single-line failure reason (empty on success) |
-| `checked-commit-count` | Number of commits that were inspected |
+| Output                 | Description                                                  |
+| ---------------------- | ------------------------------------------------------------ |
+| `verified`             | `true` or `false`                                            |
+| `reason`               | Human-readable single-line failure reason (empty on success) |
+| `checked-commit-count` | Number of commits that were inspected                        |
 
 ---
 
@@ -178,10 +180,10 @@ is empty (e.g. the workflow triggers on `push`), the action fails immediately wi
   `@octokit/plugin-retry` into the client. This preserves the built-in auth strategy,
   user-agent, and proxy support:
   ```ts
-  import { getOctokit } from '@actions/github'
-  import { retry } from '@octokit/plugin-retry'
+  import { getOctokit } from "@actions/github";
+  import { retry } from "@octokit/plugin-retry";
 
-  const octokit = getOctokit(token, { baseUrl, retry: { retries: 3 } }, retry)
+  const octokit = getOctokit(token, { baseUrl, retry: { retries: 3 } }, retry);
   ```
 - **GitHub Enterprise Server (GHES):** the Octokit client must be initialised with the
   `baseUrl` derived from the `github-api-url` input (passed via the options object above),
@@ -280,23 +282,23 @@ runs:
 
 ### Unit tests (jest + fixtures)
 
-| Test scenario | Expected result |
-|---|---|
-| Happy path — all rules satisfied | `verified=true`, no reason |
-| Wrong login (correct ID) | fail: wrong login |
-| Correct login, wrong ID | fail: wrong ID |
-| Fork PR (`require-same-repo=true`) | fail: fork not allowed |
-| Fork PR (`require-same-repo=false`) | pass |
-| Unverified commit | fail: unverified commit |
-| Null author metadata (`fail-on-missing-author-metadata=true`) | fail: null metadata |
-| Null author metadata (`fail-on-missing-author-metadata=false`) | pass |
-| Committer is `web-flow` (`require-committer-login-match=true`) | pass (in allowed list) |
-| Committer is unknown login (`require-committer-login-match=true`) | fail: unexpected committer |
-| Committer is `web-flow` (`require-committer-login-match=false`) | pass (check skipped) |
-| Multi-page commit list (pagination) | all pages checked |
-| API 500 error (after retries exhausted) | hard fail with API error message |
-| PR with 0 commits | fail: no commits found |
-| Missing `pr-number` (non-PR event trigger) | fail: pr-number is required |
+| Test scenario                                                     | Expected result                  |
+| ----------------------------------------------------------------- | -------------------------------- |
+| Happy path — all rules satisfied                                  | `verified=true`, no reason       |
+| Wrong login (correct ID)                                          | fail: wrong login                |
+| Correct login, wrong ID                                           | fail: wrong ID                   |
+| Fork PR (`require-same-repo=true`)                                | fail: fork not allowed           |
+| Fork PR (`require-same-repo=false`)                               | pass                             |
+| Unverified commit                                                 | fail: unverified commit          |
+| Null author metadata (`fail-on-missing-author-metadata=true`)     | fail: null metadata              |
+| Null author metadata (`fail-on-missing-author-metadata=false`)    | pass                             |
+| Committer is `web-flow` (`require-committer-login-match=true`)    | pass (in allowed list)           |
+| Committer is unknown login (`require-committer-login-match=true`) | fail: unexpected committer       |
+| Committer is `web-flow` (`require-committer-login-match=false`)   | pass (check skipped)             |
+| Multi-page commit list (pagination)                               | all pages checked                |
+| API 500 error (after retries exhausted)                           | hard fail with API error message |
+| PR with 0 commits                                                 | fail: no commits found           |
+| Missing `pr-number` (non-PR event trigger)                        | fail: pr-number is required      |
 
 ### CI checks (`.github/workflows/ci.yml`)
 
@@ -478,15 +480,15 @@ jobs:
 
 ## 15. Maintenance Plan
 
-| Activity | Cadence |
-|---|---|
-| Dependabot npm updates | Weekly (auto PR) |
-| Dependabot Actions updates | Weekly (auto PR) |
-| OpenSSF Scorecard review | Monthly |
-| Changelog update | Every release |
-| Node.js version review | At each new LTS release |
-| Backward compat audit before MAJOR | Per major release |
-| Security disclosures | Via `SECURITY.md` process |
+| Activity                           | Cadence                   |
+| ---------------------------------- | ------------------------- |
+| Dependabot npm updates             | Weekly (auto PR)          |
+| Dependabot Actions updates         | Weekly (auto PR)          |
+| OpenSSF Scorecard review           | Monthly                   |
+| Changelog update                   | Every release             |
+| Node.js version review             | At each new LTS release   |
+| Backward compat audit before MAJOR | Per major release         |
+| Security disclosures               | Via `SECURITY.md` process |
 
 ---
 
@@ -504,4 +506,3 @@ jobs:
   an additional identity signal beyond the bot account login/ID.
 - **`author_association` check** — optionally require the PR author's association to be
   a known value (e.g., `BOT` or `MEMBER`).
-

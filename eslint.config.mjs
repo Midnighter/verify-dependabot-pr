@@ -5,6 +5,13 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ['dist/', 'lib/', 'coverage/', '__fixtures__/', 'tests/acceptance/features/', '*.mjs'],
+    ignores: [
+      'dist/',
+      'lib/',
+      'coverage/',
+      '__fixtures__/',
+      'tests/acceptance/features/',
+      '*.mjs',
+    ],
   },
 );

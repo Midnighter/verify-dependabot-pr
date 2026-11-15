@@ -65,7 +65,8 @@ export function verifyPolicy(
     if (pr.head.repo === null) {
       return {
         verified: false,
-        reason: 'PR head repo is null (fork may have been deleted). Fork PRs are not allowed.',
+        reason:
+          'PR head repo is null (fork may have been deleted). Fork PRs are not allowed.',
         checkedCommitCount,
       };
     }

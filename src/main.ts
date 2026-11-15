@@ -20,9 +20,7 @@ function parseInputs(): ActionInputs {
   const expectedIdRaw = core.getInput('expected-id');
   const expectedId = parseInt(expectedIdRaw, 10);
   if (isNaN(expectedId) || expectedId <= 0) {
-    throw new Error(
-      `expected-id must be a positive integer, got "${expectedIdRaw}".`,
-    );
+    throw new Error(`expected-id must be a positive integer, got "${expectedIdRaw}".`);
   }
 
   const allowedCommitterLoginsRaw = core.getInput('allowed-committer-logins');
@@ -41,9 +39,7 @@ function parseInputs(): ActionInputs {
     failOnMissingAuthorMetadata: core.getBooleanInput(
       'fail-on-missing-author-metadata',
     ),
-    requireCommitterLoginMatch: core.getBooleanInput(
-      'require-committer-login-match',
-    ),
+    requireCommitterLoginMatch: core.getBooleanInput('require-committer-login-match'),
     allowedCommitterLogins,
     githubApiUrl: core.getInput('github-api-url'),
   };

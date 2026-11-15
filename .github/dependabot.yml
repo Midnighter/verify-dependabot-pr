@@ -12,7 +12,6 @@ updates:
       default-days: 14
       semver-major-days: 21
 
-
   - package-ecosystem: github-actions
     directory: /
     schedule:

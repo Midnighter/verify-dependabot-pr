@@ -104,7 +104,11 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_unverified.json');
 
-    const result = verifyPolicy(defaultInputs({ requireVerifiedCommits: true }), pr, commits);
+    const result = verifyPolicy(
+      defaultInputs({ requireVerifiedCommits: true }),
+      pr,
+      commits,
+    );
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('not verified');
@@ -114,7 +118,11 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_unverified.json');
 
-    const result = verifyPolicy(defaultInputs({ requireVerifiedCommits: false }), pr, commits);
+    const result = verifyPolicy(
+      defaultInputs({ requireVerifiedCommits: false }),
+      pr,
+      commits,
+    );
 
     expect(result.verified).toBe(true);
   });
@@ -123,7 +131,11 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_null_author.json');
 
-    const result = verifyPolicy(defaultInputs({ failOnMissingAuthorMetadata: true }), pr, commits);
+    const result = verifyPolicy(
+      defaultInputs({ failOnMissingAuthorMetadata: true }),
+      pr,
+      commits,
+    );
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
@@ -148,7 +160,10 @@ describe('verifyPolicy', () => {
 
     // commits_verified.json has committer login "web-flow" which is in allowedCommitterLogins
     const result = verifyPolicy(
-      defaultInputs({ requireCommitterLoginMatch: true, allowedCommitterLogins: ['web-flow'] }),
+      defaultInputs({
+        requireCommitterLoginMatch: true,
+        allowedCommitterLogins: ['web-flow'],
+      }),
       pr,
       commits,
     );
@@ -165,7 +180,10 @@ describe('verifyPolicy', () => {
     }));
 
     const result = verifyPolicy(
-      defaultInputs({ requireCommitterLoginMatch: true, allowedCommitterLogins: ['web-flow'] }),
+      defaultInputs({
+        requireCommitterLoginMatch: true,
+        allowedCommitterLogins: ['web-flow'],
+      }),
       pr,
       modifiedCommits,
     );
@@ -219,9 +237,7 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
     const modifiedCommits: PullRequestCommit[] = commits.map((c, i) =>
-      i === 0
-        ? { ...c, author: { login: 'someone-else', id: c.author!.id } }
-        : c,
+      i === 0 ? { ...c, author: { login: 'someone-else', id: c.author!.id } } : c,
     );
 
     const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
