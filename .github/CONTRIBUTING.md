@@ -67,8 +67,10 @@ npm run test            # Jest unit tests with coverage
 npm run build           # esbuild bundle → dist/
 ```
 
-CI also runs `npm audit --audit-level=high`, which fails on high or critical
-vulnerabilities in any dependency.
+CI also runs `npm audit --omit=dev`, which fails on vulnerabilities of any
+severity in the runtime dependencies that the action bundles, and
+`npm audit --audit-level=high`, which fails on high or critical vulnerabilities
+in any dependency.
 
 [Amp](https://ampcode.com/) agents run the same checks before every commit
 through the project plugin `.amp/plugins/pre-commit-checks.ts`. When a workflow

@@ -27,6 +27,7 @@ jobs:
           cache: npm
       - uses: astral-sh/setup-uv@v10.3.3
       - run: npm ci --ignore-scripts
+      - run: npm audit --omit=dev
       - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run lint:shell

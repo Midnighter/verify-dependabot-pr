@@ -8,6 +8,7 @@ const repoRoot = path.resolve(import.meta.dir, '..', '..');
 
 // The steps of the CI `ci` job, with the local Node version only.
 const checks = [
+  'npm audit --omit=dev',
   'npm audit --audit-level=high',
   'npm run lint',
   'npm run lint:shell',
