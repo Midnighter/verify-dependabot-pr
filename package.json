@@ -12,10 +12,12 @@
     "test:unit": "jest --selectProjects unit",
     "test:acceptance": "jest --selectProjects acceptance",
     "lint": "eslint .",
+    "lint:shell": "uvx --from shellcheck-py==0.11.0.1 shellcheck scripts/*.sh",
+    "lint:workflows": "uvx --from actionlint-py==1.7.12.25 --with shellcheck-py==0.11.0.1 actionlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "all": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build"
+    "all": "npm run lint && npm run lint:shell && npm run lint:workflows && npm run format:check && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@actions/core": "^3.0.1",

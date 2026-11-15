@@ -34,7 +34,9 @@ the approach.
 
 ## Development setup
 
-Node.js 24 or later is required.
+Node.js 24 or later is required. The shell script and workflow linters run
+through [uv](https://docs.astral.sh/uv/)'s `uvx`, which fetches the pinned
+ShellCheck and actionlint versions on first use.
 
 ```bash
 # Install dependencies (clean install — matches CI exactly).
@@ -56,11 +58,13 @@ npm run all
 Individual steps:
 
 ```bash
-npm run lint          # ESLint
-npm run format:check  # Prettier (`npm run format` rewrites the files)
-npm run typecheck     # TypeScript strict type checking (no emit)
-npm run test          # Jest unit tests with coverage
-npm run build         # esbuild bundle → dist/
+npm run lint            # ESLint
+npm run lint:shell      # ShellCheck on scripts/
+npm run lint:workflows  # actionlint (and ShellCheck on `run:` steps) on workflows
+npm run format:check    # Prettier (`npm run format` rewrites the files)
+npm run typecheck       # TypeScript strict type checking (no emit)
+npm run test            # Jest unit tests with coverage
+npm run build           # esbuild bundle → dist/
 ```
 
 ## Testing
