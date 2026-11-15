@@ -49,17 +49,18 @@ not committed to `main`; the release workflow builds it (see
 ## Running the full check suite
 
 ```bash
-# Lint, type-check, test, and build in one command.
+# Lint, check formatting, type-check, test, and build in one command.
 npm run all
 ```
 
 Individual steps:
 
 ```bash
-npm run lint       # ESLint
-npm run typecheck  # TypeScript strict type checking (no emit)
-npm run test       # Jest unit tests with coverage
-npm run build      # esbuild bundle → dist/
+npm run lint          # ESLint
+npm run format:check  # Prettier (`npm run format` rewrites the files)
+npm run typecheck     # TypeScript strict type checking (no emit)
+npm run test          # Jest unit tests with coverage
+npm run build         # esbuild bundle → dist/
 ```
 
 ## Testing
@@ -82,6 +83,8 @@ responses.
   All code must pass `tsc --noEmit` without errors.
 - **ESLint** is configured via `eslint.config.mjs`. Run `npm run lint` before
   committing.
+- **Prettier** formats all files, including the Gherkin `.feature` files, with
+  the settings in `.prettierrc.json`. Run `npm run format` before committing.
 - Use explicit types for function parameters and return values where the
   inference is not obvious.
 - Prefer `const` over `let`; avoid `var`.

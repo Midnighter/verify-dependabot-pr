@@ -108,9 +108,7 @@ defineFeature(feature, (defineScenario) => {
     });
 
     then(failsWithPattern, (message: string) => {
-      expect(mockSetFailed).toHaveBeenCalledWith(
-        expect.stringContaining(message),
-      );
+      expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
     });
   });
 
@@ -133,9 +131,7 @@ defineFeature(feature, (defineScenario) => {
     });
 
     then(failsWithPattern, (message: string) => {
-      expect(mockSetFailed).toHaveBeenCalledWith(
-        expect.stringContaining(message),
-      );
+      expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
     });
   });
 
@@ -164,9 +160,7 @@ defineFeature(feature, (defineScenario) => {
       });
 
       then(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(
-          expect.stringContaining(message),
-        );
+        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
       });
     },
   );
@@ -300,9 +294,7 @@ defineFeature(feature, (defineScenario) => {
       });
 
       and(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(
-          expect.stringContaining(message),
-        );
+        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
       });
     },
   );
@@ -361,9 +353,7 @@ defineFeature(feature, (defineScenario) => {
       });
 
       then(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(
-          expect.stringContaining(message),
-        );
+        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
       });
     },
   );

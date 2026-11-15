@@ -97,7 +97,9 @@ describe('fetchAllCommits', () => {
       });
     }
 
-    const octokit = buildMockOctokit({ listCommitsPages: [page1, page2] }) as MockOctokit;
+    const octokit = buildMockOctokit({
+      listCommitsPages: [page1, page2],
+    }) as MockOctokit;
 
     const result = await fetchAllCommits(octokit, 'owner', 'repo', 42);
 
@@ -258,7 +260,9 @@ describe('response validation', () => {
 
   it('throws on invalid commit response missing commit.verification', async () => {
     const octokit = buildMockOctokit({
-      listCommitsPages: [[{ sha: 'abc123', commit: { message: 'x' } } as unknown as PullRequestCommit]],
+      listCommitsPages: [
+        [{ sha: 'abc123', commit: { message: 'x' } } as unknown as PullRequestCommit],
+      ],
     }) as MockOctokit;
 
     await expect(fetchAllCommits(octokit, 'owner', 'repo', 42)).rejects.toThrow(

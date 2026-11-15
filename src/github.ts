@@ -19,7 +19,9 @@ function assertPullRequest(data: unknown): asserts data is PullRequest {
     typeof d.user !== 'object' ||
     d.user === null
   ) {
-    throw new Error('Unexpected PR response shape: missing required fields (number, user).');
+    throw new Error(
+      'Unexpected PR response shape: missing required fields (number, user).',
+    );
   }
   const user = d.user as Record<string, unknown>;
   if (typeof user.login !== 'string' || typeof user.id !== 'number') {
@@ -30,18 +32,25 @@ function assertPullRequest(data: unknown): asserts data is PullRequest {
 /**
  * Validate that an API response item contains the required PullRequestCommit fields.
  */
-function assertPullRequestCommit(data: unknown, index: number): asserts data is PullRequestCommit {
+function assertPullRequestCommit(
+  data: unknown,
+  index: number,
+): asserts data is PullRequestCommit {
   const d = data as Record<string, unknown>;
   if (typeof d !== 'object' || d === null || typeof d.sha !== 'string') {
     throw new Error(`Unexpected commit response shape at index ${index}: missing sha.`);
   }
   const commit = d.commit as Record<string, unknown> | undefined;
   if (typeof commit !== 'object' || commit === null) {
-    throw new Error(`Unexpected commit response shape at index ${index}: missing commit object.`);
+    throw new Error(
+      `Unexpected commit response shape at index ${index}: missing commit object.`,
+    );
   }
   const verification = commit.verification as Record<string, unknown> | undefined;
   if (typeof verification !== 'object' || verification === null) {
-    throw new Error(`Unexpected commit response shape at index ${index}: missing commit.verification.`);
+    throw new Error(
+      `Unexpected commit response shape at index ${index}: missing commit.verification.`,
+    );
   }
 }
 
@@ -52,19 +61,20 @@ function checkRateLimit(headers: Record<string, string | number | undefined>): v
   const remaining = headers['x-ratelimit-remaining'];
   if (remaining !== undefined) {
     const value = typeof remaining === 'string' ? parseInt(remaining, 10) : remaining;
-    if (typeof value === 'number' && !isNaN(value) && value < RATE_LIMIT_WARNING_THRESHOLD) {
+    if (
+      typeof value === 'number' &&
+      !isNaN(value) &&
+      value < RATE_LIMIT_WARNING_THRESHOLD
+    ) {
       core.warning(
         `GitHub API rate limit is low: ${value} requests remaining. ` +
-        'Consider using a token with higher rate limits.',
+          'Consider using a token with higher rate limits.',
       );
     }
   }
 }
 
-export function createClient(
-  token: string,
-  baseUrl: string,
-): OctokitClient {
+export function createClient(token: string, baseUrl: string): OctokitClient {
   return getOctokit(token, { baseUrl, retry: { retries: 3 } }, retry);
 }
 
