@@ -70,6 +70,11 @@ npm run build           # esbuild bundle → dist/
 CI also runs `npm audit --audit-level=high`, which fails on high or critical
 vulnerabilities in any dependency.
 
+[Amp](https://ampcode.com/) agents run the same checks before every commit
+through the project plugin `.amp/plugins/pre-commit-checks.ts`. When a workflow
+changed, the plugin also runs zizmor and `gh actions-lock --verify`, so it needs
+the `gh actions-lock` extension (see [GitHub Actions](#github-actions)).
+
 ## Testing
 
 Tests live alongside the source in `src/` and use [Jest](https://jestjs.io/)
