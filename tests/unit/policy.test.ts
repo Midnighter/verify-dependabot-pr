@@ -13,9 +13,16 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {
     githubToken: 'test-token',
     prNumber: 42,
+    headSha: 'def456',
     expectedId: 49699333,
     ...overrides,
   };
+}
+
+/** pr_dependabot.json with its head moved to the last of these commits. */
+function prEndingAt(commits: PullRequestCommit[]): PullRequest {
+  const pr = loadFixture<PullRequest>('pr_dependabot.json');
+  return { ...pr, head: { ...pr.head, sha: commits[commits.length - 1].sha } };
 }
 
 describe('verifyPolicy', () => {
@@ -97,10 +104,10 @@ describe('verifyPolicy', () => {
   });
 
   it('null author metadata fails with "null"', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_null_author.json');
+    const pr = prEndingAt(commits);
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyPolicy(defaultInputs({ headSha: 'abc123' }), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
@@ -158,14 +165,18 @@ describe('verifyPolicy', () => {
   });
 
   it('pagination — combined page1 (30) + page2 (5) = 35 commits all pass', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const page1 = loadFixture<PullRequestCommit[]>('commits_paginated/page1.json');
     const page2 = loadFixture<PullRequestCommit[]>('commits_paginated/page2.json');
     const allCommits = [...page1, ...page2];
+    const pr = prEndingAt(allCommits);
 
     expect(allCommits).toHaveLength(35);
 
-    const result = verifyPolicy(defaultInputs(), pr, allCommits);
+    const result = verifyPolicy(
+      defaultInputs({ headSha: 'page2-commit-05' }),
+      pr,
+      allCommits,
+    );
 
     expect(result.verified).toBe(true);
     expect(result.checkedCommitCount).toBe(35);
@@ -201,7 +212,6 @@ describe('verifyPolicy', () => {
   });
 
   it('null committer metadata fails with "null committer"', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits: PullRequestCommit[] = [
       {
         sha: 'abc123',
@@ -213,8 +223,9 @@ describe('verifyPolicy', () => {
         committer: null,
       },
     ];
+    const pr = prEndingAt(commits);
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyPolicy(defaultInputs({ headSha: 'abc123' }), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null committer');

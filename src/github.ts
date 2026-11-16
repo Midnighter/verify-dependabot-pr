@@ -33,6 +33,7 @@ function assertPullRequest(data: unknown): asserts data is PullRequest {
   if (
     typeof head !== 'object' ||
     head === null ||
+    typeof head.sha !== 'string' ||
     !(head.repo === null || hasNumericId(head.repo)) ||
     typeof base !== 'object' ||
     base === null ||

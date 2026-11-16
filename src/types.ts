@@ -6,6 +6,7 @@
 export interface ActionInputs {
   githubToken: string;
   prNumber: number;
+  headSha: string;
   expectedId: number;
 }
 
@@ -18,6 +19,7 @@ export interface PullRequest {
     type: string;
   };
   head: {
+    sha: string;
     repo: {
       id: number;
       full_name: string;

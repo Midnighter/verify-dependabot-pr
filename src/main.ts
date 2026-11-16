@@ -17,6 +17,13 @@ function parseInputs(): ActionInputs {
     throw new Error(`pr-number must be a positive integer, got "${prNumberRaw}".`);
   }
 
+  const headSha = core.getInput('head-sha');
+  if (!headSha) {
+    throw new Error(
+      'head-sha is required — this action must run on pull_request events.',
+    );
+  }
+
   const expectedIdRaw = core.getInput('expected-id');
   const expectedId = parseInt(expectedIdRaw, 10);
   if (isNaN(expectedId) || expectedId <= 0) {
@@ -36,6 +43,7 @@ function parseInputs(): ActionInputs {
   return {
     githubToken: core.getInput('github-token', { required: true }),
     prNumber,
+    headSha,
     expectedId,
   };
 }
@@ -59,6 +67,7 @@ export async function run(): Promise<void> {
     core.setOutput('verified', String(result.verified));
     core.setOutput('reason', result.reason);
     core.setOutput('checked-commit-count', String(result.checkedCommitCount));
+    core.setOutput('head-sha', result.verified ? pr.head.sha : '');
 
     if (result.verified) {
       core.info('✅ PR verified as genuine Dependabot PR.');

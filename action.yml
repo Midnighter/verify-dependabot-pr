@@ -17,6 +17,12 @@ inputs:
     description: PR number to verify.
     default: ${{ github.event.pull_request.number }}
     required: false
+  head-sha:
+    description: >
+      Head commit SHA the workflow ran for. The action fails if the PR's head
+      has moved on. Pass it together with pr-number.
+    default: ${{ github.event.pull_request.head.sha }}
+    required: false
   expected-id:
     description: >
       Dependabot's numeric account ID. Set it only on GitHub Enterprise
@@ -32,6 +38,10 @@ outputs:
     description: Human-readable failure reason (empty on success).
   checked-commit-count:
     description: Number of commits inspected.
+  head-sha:
+    description: >
+      The head commit SHA that was verified (empty unless verified is true).
+      Merge or approve only this commit.
 
 runs:
   using: node24

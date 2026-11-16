@@ -17,6 +17,12 @@ Feature: Failing closed on invalid input and API errors
     Then the action fails with a message containing "must be a positive integer"
     And the "verified" output is "false"
 
+  Scenario: Missing head SHA fails the action
+    Given the "head-sha" input is ""
+    When the action runs
+    Then the action fails with a message containing "head-sha is required"
+    And the "verified" output is "false"
+
   Scenario: Invalid expected-id fails the action
     Given the "expected-id" input is "not-a-number"
     When the action runs

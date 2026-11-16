@@ -30,6 +30,7 @@ const actionDefaults: Record<string, string> = Object.fromEntries(
 const expressionValues: Record<string, () => string> = {
   'github.token': () => '',
   'github.event.pull_request.number': () => '',
+  'github.event.pull_request.head.sha': () => '',
 };
 
 function resolveDefault(value: string): string {

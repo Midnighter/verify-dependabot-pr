@@ -69,6 +69,18 @@ export function verifyPolicy(
     );
   }
 
+  // The result must cover exactly the commit the workflow ran for. The PR can
+  // move between the event and these API calls, or between the two calls.
+  if (pr.head.sha !== inputs.headSha) {
+    return fail(
+      `PR head ${pr.head.sha} is not the head commit ${inputs.headSha} that the workflow ran for. The PR changed; verify it again.`,
+    );
+  }
+  const lastSha = commits[commits.length - 1].sha;
+  if (lastSha !== pr.head.sha) {
+    return fail(`The last listed commit ${lastSha} is not the PR head ${pr.head.sha}.`);
+  }
+
   // A commit's author and committer are whatever it claims, unless GitHub
   // verified its signature, and then the committer is the key's owner. So
   // only a verified commit with Dependabot as author and web-flow or

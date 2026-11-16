@@ -241,13 +241,20 @@ describe('response validation', () => {
 
   it.each([
     ['head', { repo: { id: 1 } }],
+    ['head.sha', { head: { repo: { id: 1 } }, base: { repo: { id: 1 } } }],
     [
       'head.repo.id',
-      { head: { repo: { full_name: 'owner/repo' } }, base: { repo: { id: 1 } } },
+      {
+        head: { sha: 'def456', repo: { full_name: 'owner/repo' } },
+        base: { repo: { id: 1 } },
+      },
     ],
     [
       'base.repo.id',
-      { head: { repo: null }, base: { repo: { full_name: 'owner/repo' } } },
+      {
+        head: { sha: 'def456', repo: null },
+        base: { repo: { full_name: 'owner/repo' } },
+      },
     ],
   ])('throws on invalid PR response missing %s', async (_, fields) => {
     const octokit = buildMockOctokit({
