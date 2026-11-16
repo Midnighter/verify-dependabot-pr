@@ -71,11 +71,12 @@ export async function run(): Promise<void> {
       core.setFailed(`❌ Verification failed: ${result.reason}`);
     }
   } catch (error) {
-    if (error instanceof Error) {
-      core.setFailed(error.message);
-    } else {
-      core.setFailed('An unexpected error occurred.');
-    }
+    const message =
+      error instanceof Error ? error.message : 'An unexpected error occurred.';
+    // A consumer with continue-on-error must not read a missing output as a pass.
+    core.setOutput('verified', 'false');
+    core.setOutput('reason', message);
+    core.setFailed(message);
   }
 }
 
