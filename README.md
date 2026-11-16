@@ -189,6 +189,18 @@ their content cannot run as shell code.
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+## Verifying a release
+
+Each release attests that its `dist/index.js` was built by this repository's
+release workflow from a commit on `main`. Download the file at the release tag
+and verify it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Midnighter/verify-dependabot-pr/0.3.0/dist/index.js
+gh attestation verify index.js --repo Midnighter/verify-dependabot-pr \
+  --signer-workflow Midnighter/verify-dependabot-pr/.github/workflows/release.yml
+```
+
 ## Required permissions
 
 The following permissions must be granted to the workflow job. No write

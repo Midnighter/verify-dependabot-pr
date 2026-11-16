@@ -146,9 +146,12 @@ git tag 1.2.3
 git push origin 1.2.3
 ```
 
-The release workflow then runs the full check suite, builds `dist/`, commits it
-on top of the tagged commit, moves the tag to that commit, creates the GitHub
-Release, and moves the major version tag (e.g. `1`). The release commit is
+The release workflow then checks that the tagged commit is on `main`, runs the
+lint, type check and tests, builds `dist/`, attests the build provenance of
+`dist/index.js`, commits `dist/` on top of the tagged commit, moves the tag to
+that commit, creates the GitHub Release, and moves the major version tag (e.g.
+`1`). A tag on a commit that is not on `main` fails the build. ShellCheck and
+actionlint run only in CI, because they need uv. The release commit is
 reachable only through the tags, so `main` never contains `dist/`. Afterwards,
 run `git fetch --tags --force` to update your local tag.
 

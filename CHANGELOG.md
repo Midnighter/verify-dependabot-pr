@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Releases attest the build provenance of `dist/index.js`. Check it with
+  `gh attestation verify index.js --repo Midnighter/verify-dependabot-pr`.
 - The `head-sha` input, which defaults to the head commit of the triggering
   `pull_request` event, and the `head-sha` output, the verified commit.
 
