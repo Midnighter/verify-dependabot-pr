@@ -1,18 +1,48 @@
-import { loadFeature, defineFeature } from 'jest-cucumber';
+import { autoBindSteps, loadFeatures, type StepDefinitions } from 'jest-cucumber';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { parse } from 'yaml';
 import { run } from '../../../src/main';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const feature = loadFeature(
-  path.join(__dirname, '..', 'features', 'verify-dependabot-pr.feature'),
+const repoRoot = path.join(__dirname, '..', '..', '..');
+const fixturesDir = path.join(repoRoot, '__fixtures__');
+
+function loadFixture(name: string): unknown {
+  return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), 'utf-8'));
+}
+
+// The runner gives every input its default from action.yml, so the scenarios
+// run with the same defaults.
+const actionDefaults: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    (
+      parse(fs.readFileSync(path.join(repoRoot, 'action.yml'), 'utf-8')) as {
+        inputs: Record<string, { default?: string }>;
+      }
+    ).inputs,
+  ).map(([name, input]) => [name, input.default ?? '']),
 );
 
-const fixturesDir = path.join(__dirname, '..', '..', '..', '__fixtures__');
+// Values the runner substitutes for the expressions in those defaults. The
+// scenarios don't simulate a pull_request event, so they set the PR inputs.
+const expressionValues: Record<string, () => string> = {
+  'github.token': () => '',
+  'github.api_url': () => process.env.GITHUB_API_URL ?? '',
+  'github.event.pull_request.number': () => '',
+};
 
-function loadFixture<T>(name: string): T {
-  return JSON.parse(fs.readFileSync(path.join(fixturesDir, name), 'utf-8')) as T;
+function resolveDefault(value: string): string {
+  const expression = /^\$\{\{\s*(.+?)\s*\}\}$/.exec(value);
+  if (expression === null) {
+    return value;
+  }
+  const resolve = expressionValues[expression[1]];
+  if (resolve === undefined) {
+    throw new Error(`The harness cannot resolve the action.yml default "${value}".`);
+  }
+  return resolve();
 }
 
 const mockGetInput = core.getInput as jest.Mock;
@@ -22,339 +52,159 @@ const mockSetFailed = core.setFailed as jest.Mock;
 const mockGetOctokit = github.getOctokit as jest.Mock;
 
 interface World {
-  stringInputs: Record<string, string>;
-  booleanInputs: Record<string, boolean>;
-  prFixture: unknown | null;
-  commitsFixture: unknown | null;
+  inputs: Record<string, string>;
+  pr: Record<string, unknown> | null;
+  commits: unknown[];
   throwNonError: string | null;
 }
 
-function createWorld(): World {
-  return {
-    stringInputs: {},
-    booleanInputs: {},
-    prFixture: null,
-    commitsFixture: null,
-    throwNonError: null,
-  };
+let world: World;
+const originalEnv = { ...process.env };
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  world = { inputs: {}, pr: null, commits: [], throwNonError: null };
+  process.env.GITHUB_SERVER_URL = 'https://github.com';
+  process.env.GITHUB_API_URL = 'https://api.github.com';
+});
+
+afterEach(() => {
+  process.env = { ...originalEnv };
+});
+
+// Same contract as @actions/core: trimmed value, error when required and empty.
+function getInput(name: string, options?: core.InputOptions): string {
+  const value = (
+    world.inputs[name] ?? resolveDefault(actionDefaults[name] ?? '')
+  ).trim();
+  if (options?.required && value === '') {
+    throw new Error(`Input required and not supplied: ${name}`);
+  }
+  return value;
 }
 
-function wireMocksAndRun(world: World): Promise<void> {
-  jest.clearAllMocks();
+// Same contract as @actions/core: only YAML 1.2 Core Schema booleans.
+function getBooleanInput(name: string, options?: core.InputOptions): boolean {
+  const value = getInput(name, options);
+  if (['true', 'True', 'TRUE'].includes(value)) {
+    return true;
+  }
+  if (['false', 'False', 'FALSE'].includes(value)) {
+    return false;
+  }
+  throw new TypeError(
+    `Input does not meet YAML 1.2 "Core Schema" specification: ${name}`,
+  );
+}
 
-  mockGetInput.mockImplementation((name: string) => {
-    return world.stringInputs[name] ?? '';
-  });
+/** Set a dotted path such as "head.repo.id" on a copy of the PR fixture. */
+function setField(target: Record<string, unknown>, fieldPath: string, value: unknown) {
+  const keys = fieldPath.split('.');
+  let node = target;
+  for (const key of keys.slice(0, -1)) {
+    node = node[key] as Record<string, unknown>;
+  }
+  node[keys[keys.length - 1]] = value;
+}
 
-  mockGetBooleanInput.mockImplementation((name: string) => {
-    return world.booleanInputs[name] ?? false;
-  });
+function lastOutput(name: string): unknown {
+  const calls = mockSetOutput.mock.calls.filter(([outputName]) => outputName === name);
+  return calls.length === 0 ? undefined : calls[calls.length - 1][1];
+}
 
-  if (world.throwNonError !== null) {
-    const mockOctokit = {
-      rest: {
-        pulls: {
+async function runAction(): Promise<void> {
+  mockGetInput.mockImplementation(getInput);
+  mockGetBooleanInput.mockImplementation(getBooleanInput);
+
+  const headers = { 'x-ratelimit-remaining': '4999' };
+  const pulls =
+    world.throwNonError !== null
+      ? {
           get: jest.fn().mockRejectedValue(world.throwNonError),
           listCommits: jest.fn(),
-        },
-      },
-    };
-    mockGetOctokit.mockReturnValue(mockOctokit);
-  } else if (world.prFixture !== null) {
-    const headers = { 'x-ratelimit-remaining': '4999' };
-    const mockOctokit = {
-      rest: {
-        pulls: {
-          get: jest.fn().mockResolvedValue({ data: world.prFixture, headers }),
-          listCommits: jest
-            .fn()
-            .mockResolvedValue({ data: world.commitsFixture ?? [], headers }),
-        },
-      },
-    };
-    mockGetOctokit.mockReturnValue(mockOctokit);
-  }
+        }
+      : {
+          get: jest.fn().mockResolvedValue({ data: world.pr, headers }),
+          listCommits: jest.fn().mockResolvedValue({ data: world.commits, headers }),
+        };
+  mockGetOctokit.mockReturnValue({ rest: { pulls } });
 
-  return run();
+  await run();
 }
 
-// Step matchers reused across scenarios.
-const inputIsPattern = /^the "(.*)" input is "(.*)"$/;
-const inputEnabledPattern = /^the "(.*)" input is enabled$/;
-const inputDisabledPattern = /^the "(.*)" input is disabled$/;
-const prFixturePattern = /^the GitHub API returns PR fixture "(.*)"$/;
-const commitsFixturePattern = /^the GitHub API returns commits fixture "(.*)"$/;
-const throwNonErrorPattern = /^the GitHub API throws a non-Error value "(.*)"$/;
-const failsWithPattern = /^the action fails with a message containing "(.*)"$/;
-const outputIsPattern = /^the "(.*)" output is "(.*)"$/;
-
-defineFeature(feature, (defineScenario) => {
-  // Scenario: Missing PR number fails the action
-  // Steps: background(1) + given(1) + when(1) + then(1) = 4
-  defineScenario('Missing PR number fails the action', ({ given, when, then }) => {
-    let world: World;
-
-    given(/^the GitHub token is "(.*)"$/, (token: string) => {
-      world = createWorld();
-      world.stringInputs['github-token'] = token;
-    });
-
-    given(inputIsPattern, (inputName: string, value: string) => {
-      world.stringInputs[inputName] = value;
-    });
-
-    when('the action runs', async () => {
-      await wireMocksAndRun(world);
-    });
-
-    then(failsWithPattern, (message: string) => {
-      expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
-    });
+const steps: StepDefinitions = ({ given, when, then }) => {
+  // The PR every scenario starts from. Its head commit is the head.sha in
+  // pr_dependabot.json and the last commit in commits_verified.json.
+  given('a genuine Dependabot PR whose head commit is "def456"', () => {
+    world.inputs['github-token'] = 'test-token';
+    world.inputs['pr-number'] = '42';
+    world.inputs['head-sha'] = 'def456';
+    world.pr = loadFixture('pr_dependabot.json') as Record<string, unknown>;
+    world.commits = loadFixture('commits_verified.json') as unknown[];
   });
 
-  // Scenario: Invalid PR number fails the action
-  // Steps: background(1) + given(1) + when(1) + then(1) = 4
-  defineScenario('Invalid PR number fails the action', ({ given, when, then }) => {
-    let world: World;
-
-    given(/^the GitHub token is "(.*)"$/, (token: string) => {
-      world = createWorld();
-      world.stringInputs['github-token'] = token;
-    });
-
-    given(inputIsPattern, (inputName: string, value: string) => {
-      world.stringInputs[inputName] = value;
-    });
-
-    when('the action runs', async () => {
-      await wireMocksAndRun(world);
-    });
-
-    then(failsWithPattern, (message: string) => {
-      expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
-    });
+  given(/^the "(.*)" input is "(.*)"$/, (name: string, value: string) => {
+    world.inputs[name] = value;
   });
 
-  // Scenario: Invalid expected-id fails the action
-  // Steps: background(1) + given(1) + and(1) + when(1) + then(1) = 5
-  defineScenario(
-    'Invalid expected-id fails the action',
-    ({ given, when, then, and }) => {
-      let world: World;
+  given(/^the "(.*)" input is enabled$/, (name: string) => {
+    world.inputs[name] = 'true';
+  });
 
-      given(/^the GitHub token is "(.*)"$/, (token: string) => {
-        world = createWorld();
-        world.stringInputs['github-token'] = token;
-      });
+  given(/^the "(.*)" input is disabled$/, (name: string) => {
+    world.inputs[name] = 'false';
+  });
 
-      given(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      when('the action runs', async () => {
-        await wireMocksAndRun(world);
-      });
-
-      then(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
-      });
+  given(
+    /^the "(.*)" environment variable is "(.*)"$/,
+    (name: string, value: string) => {
+      process.env[name] = value;
     },
   );
 
-  // Scenario: Successful Dependabot PR verification
-  // Steps: background(1) + given(1) + and(3 string) + and(3 enabled) + and(1 disabled)
-  //       + and(1 pr fixture) + and(1 commits fixture) + when(1) + then(1) + and(1) = 14
-  defineScenario(
-    'Successful Dependabot PR verification',
-    ({ given, when, then, and }) => {
-      let world: World;
+  given(/^the GitHub API returns PR fixture "(.*)"$/, (name: string) => {
+    world.pr = loadFixture(name) as Record<string, unknown>;
+  });
 
-      given(/^the GitHub token is "(.*)"$/, (token: string) => {
-        world = createWorld();
-        world.stringInputs['github-token'] = token;
-      });
+  // The value is JSON, so "fed789" is a string and 3 a number.
+  given(/^the PR field "(.*)" is (.*)$/, (fieldPath: string, value: string) => {
+    setField(world.pr as Record<string, unknown>, fieldPath, JSON.parse(value));
+  });
 
-      given(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
+  given(/^the GitHub API returns commits fixture "(.*)"$/, (name: string) => {
+    world.commits = loadFixture(name) as unknown[];
+  });
 
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
+  given(/^the GitHub API throws a non-Error value "(.*)"$/, (value: string) => {
+    world.throwNonError = value;
+  });
 
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
+  when('the action runs', runAction);
 
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
+  then(/^the "(.*)" output is "(.*)"$/, (name: string, value: string) => {
+    expect(lastOutput(name)).toBe(value);
+  });
 
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
+  then('the action does not fail', () => {
+    expect(mockSetFailed).not.toHaveBeenCalled();
+  });
 
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
+  then(/^the action fails with a message containing "(.*)"$/, (message: string) => {
+    expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
+  });
 
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
+  // getOctokit falls back to GITHUB_API_URL when it gets no baseUrl.
+  then(/^the GitHub API client uses "(.*)"$/, (baseUrl: string) => {
+    expect(
+      mockGetOctokit.mock.calls.map(
+        ([, options]) =>
+          (options as { baseUrl?: string } | undefined)?.baseUrl ??
+          process.env.GITHUB_API_URL,
+      ),
+    ).toEqual([baseUrl]);
+  });
+};
 
-      and(inputDisabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = false;
-      });
-
-      and(prFixturePattern, (fixtureName: string) => {
-        world.prFixture = loadFixture(fixtureName);
-      });
-
-      and(commitsFixturePattern, (fixtureName: string) => {
-        world.commitsFixture = loadFixture(fixtureName);
-      });
-
-      when('the action runs', async () => {
-        await wireMocksAndRun(world);
-      });
-
-      then(outputIsPattern, (outputName: string, value: string) => {
-        expect(mockSetOutput).toHaveBeenCalledWith(outputName, value);
-      });
-
-      and('the action does not fail', () => {
-        expect(mockSetFailed).not.toHaveBeenCalled();
-      });
-    },
-  );
-
-  // Scenario: PR author login mismatch fails verification
-  // Steps: background(1) + given(1) + and(3 string) + and(3 enabled) + and(1 disabled)
-  //       + and(1 pr fixture) + and(1 commits fixture) + when(1) + then(1) + and(1) = 14
-  defineScenario(
-    'PR author login mismatch fails verification',
-    ({ given, when, then, and }) => {
-      let world: World;
-
-      given(/^the GitHub token is "(.*)"$/, (token: string) => {
-        world = createWorld();
-        world.stringInputs['github-token'] = token;
-      });
-
-      given(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputDisabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = false;
-      });
-
-      and(prFixturePattern, (fixtureName: string) => {
-        world.prFixture = loadFixture(fixtureName);
-      });
-
-      and(commitsFixturePattern, (fixtureName: string) => {
-        world.commitsFixture = loadFixture(fixtureName);
-      });
-
-      when('the action runs', async () => {
-        await wireMocksAndRun(world);
-      });
-
-      then(outputIsPattern, (outputName: string, value: string) => {
-        expect(mockSetOutput).toHaveBeenCalledWith(outputName, value);
-      });
-
-      and(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
-      });
-    },
-  );
-
-  // Scenario: Non-Error exception is handled gracefully
-  // Steps: background(1) + given(1) + and(3 string) + and(3 enabled) + and(1 disabled)
-  //       + and(1 throw) + when(1) + then(1) = 12
-  defineScenario(
-    'Non-Error exception is handled gracefully',
-    ({ given, when, then, and }) => {
-      let world: World;
-
-      given(/^the GitHub token is "(.*)"$/, (token: string) => {
-        world = createWorld();
-        world.stringInputs['github-token'] = token;
-      });
-
-      given(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputIsPattern, (inputName: string, value: string) => {
-        world.stringInputs[inputName] = value;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputEnabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = true;
-      });
-
-      and(inputDisabledPattern, (inputName: string) => {
-        world.booleanInputs[inputName] = false;
-      });
-
-      and(throwNonErrorPattern, (errorValue: string) => {
-        world.throwNonError = errorValue;
-      });
-
-      when('the action runs', async () => {
-        await wireMocksAndRun(world);
-      });
-
-      then(failsWithPattern, (message: string) => {
-        expect(mockSetFailed).toHaveBeenCalledWith(expect.stringContaining(message));
-      });
-    },
-  );
-});
+autoBindSteps(loadFeatures(path.join(__dirname, '..', 'features', '*.feature')), [
+  steps,
+]);

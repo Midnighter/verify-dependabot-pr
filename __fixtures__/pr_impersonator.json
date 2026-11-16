@@ -5,13 +5,17 @@
     "id": 99999999,
     "type": "Bot"
   },
+  "commits": 2,
   "head": {
+    "sha": "def456",
     "repo": {
+      "id": 100001,
       "full_name": "owner/repo"
     }
   },
   "base": {
     "repo": {
+      "id": 100001,
       "full_name": "owner/repo"
     }
   }
