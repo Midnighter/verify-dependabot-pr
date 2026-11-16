@@ -13,14 +13,7 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
   return {
     githubToken: 'test-token',
     prNumber: 42,
-    expectedLogin: 'dependabot[bot]',
     expectedId: 49699333,
-    requireVerifiedCommits: true,
-    requireSameRepo: true,
-    failOnMissingAuthorMetadata: true,
-    requireCommitterLoginMatch: false,
-    allowedCommitterLogins: ['web-flow'],
-    githubApiUrl: 'https://api.github.com',
     ...overrides,
   };
 }
@@ -51,6 +44,17 @@ describe('verifyPolicy', () => {
     expect(result.reason).toContain('does not match');
   });
 
+  it('PR author with Dependabot login but type User fails', () => {
+    const pr = loadFixture<PullRequest>('pr_dependabot.json');
+    const modifiedPr: PullRequest = { ...pr, user: { ...pr.user, type: 'User' } };
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
+
+    const result = verifyPolicy(defaultInputs(), modifiedPr, commits);
+
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('type "User"');
+  });
+
   it('correct login but wrong ID — pr_impersonator fails with "ID"', () => {
     const pr = loadFixture<PullRequest>('pr_impersonator.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
@@ -61,117 +65,75 @@ describe('verifyPolicy', () => {
     expect(result.reason).toContain('ID');
   });
 
-  it('fork PR with require-same-repo=true fails with "Fork"', () => {
+  it('fork PR fails with "Fork"', () => {
     const pr = loadFixture<PullRequest>('pr_fork.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs({ requireSameRepo: true }), pr, commits);
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('Fork');
   });
 
-  it('null head.repo with require-same-repo=true fails with descriptive message', () => {
+  it('null head.repo fails with descriptive message', () => {
     const pr = loadFixture<PullRequest>('pr_deleted_fork.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs({ requireSameRepo: true }), pr, commits);
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
     expect(result.reason).toContain('Fork');
-  });
-
-  it('null head.repo with require-same-repo=false passes', () => {
-    const pr = loadFixture<PullRequest>('pr_deleted_fork.json');
-    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
-
-    const result = verifyPolicy(defaultInputs({ requireSameRepo: false }), pr, commits);
-
-    expect(result.verified).toBe(true);
-  });
-
-  it('fork PR with require-same-repo=false passes', () => {
-    const pr = loadFixture<PullRequest>('pr_fork.json');
-    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
-
-    const result = verifyPolicy(defaultInputs({ requireSameRepo: false }), pr, commits);
-
-    expect(result.verified).toBe(true);
   });
 
   it('unverified commit fails with "not verified"', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_unverified.json');
 
-    const result = verifyPolicy(
-      defaultInputs({ requireVerifiedCommits: true }),
-      pr,
-      commits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('not verified');
   });
 
-  it('unverified commit with require-verified-commits=false passes', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
-    const commits = loadFixture<PullRequestCommit[]>('commits_unverified.json');
-
-    const result = verifyPolicy(
-      defaultInputs({ requireVerifiedCommits: false }),
-      pr,
-      commits,
-    );
-
-    expect(result.verified).toBe(true);
-  });
-
-  it('null author metadata with fail-on-missing=true fails with "null"', () => {
+  it('null author metadata fails with "null"', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_null_author.json');
 
-    const result = verifyPolicy(
-      defaultInputs({ failOnMissingAuthorMetadata: true }),
-      pr,
-      commits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
   });
 
-  it('null author metadata with fail-on-missing=false passes', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
-    const commits = loadFixture<PullRequestCommit[]>('commits_null_author.json');
-
-    const result = verifyPolicy(
-      defaultInputs({ failOnMissingAuthorMetadata: false }),
-      pr,
-      commits,
-    );
-
-    expect(result.verified).toBe(true);
-  });
-
-  it('committer is web-flow with require-committer-login-match=true passes (allowed list)', () => {
+  it('Dependabot itself as committer passes', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
+    const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
+      ...c,
+      committer: { login: 'dependabot[bot]', id: 49699333 },
+    }));
 
-    // commits_verified.json has committer login "web-flow" which is in allowedCommitterLogins
-    const result = verifyPolicy(
-      defaultInputs({
-        requireCommitterLoginMatch: true,
-        allowedCommitterLogins: ['web-flow'],
-      }),
-      pr,
-      commits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(true);
   });
 
-  it('unknown committer with require-committer-login-match=true fails', () => {
+  it('committer with Dependabot login but another account ID fails', () => {
+    const pr = loadFixture<PullRequest>('pr_dependabot.json');
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
+    const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
+      ...c,
+      committer: { login: 'dependabot[bot]', id: 1000001 },
+    }));
+
+    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('committer "dependabot[bot]" (ID 1000001)');
+  });
+
+  it('unknown committer fails', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
     const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
@@ -179,34 +141,10 @@ describe('verifyPolicy', () => {
       committer: { login: 'evil-bot', id: 99999 },
     }));
 
-    const result = verifyPolicy(
-      defaultInputs({
-        requireCommitterLoginMatch: true,
-        allowedCommitterLogins: ['web-flow'],
-      }),
-      pr,
-      modifiedCommits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('evil-bot');
-  });
-
-  it('committer check skipped when require-committer-login-match=false — unknown committer passes', () => {
-    const pr = loadFixture<PullRequest>('pr_dependabot.json');
-    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
-    const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
-      ...c,
-      committer: { login: 'some-random-bot', id: 77777 },
-    }));
-
-    const result = verifyPolicy(
-      defaultInputs({ requireCommitterLoginMatch: false }),
-      pr,
-      modifiedCommits,
-    );
-
-    expect(result.verified).toBe(true);
   });
 
   it('empty commits array fails with "no commits"', () => {
@@ -246,7 +184,7 @@ describe('verifyPolicy', () => {
     expect(result.reason).toContain('does not match');
   });
 
-  it('commits at MAX_COMMITS_PER_PR with require-verified-commits=true fails hard', () => {
+  it('commits at MAX_COMMITS_PER_PR fail hard', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const baseCommit = loadFixture<PullRequestCommit[]>('commits_verified.json')[0];
     // Create 250 commits (the API maximum)
@@ -255,18 +193,14 @@ describe('verifyPolicy', () => {
       sha: `commit-${String(i).padStart(3, '0')}`,
     }));
 
-    const result = verifyPolicy(
-      defaultInputs({ requireVerifiedCommits: true }),
-      pr,
-      commits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('API maximum');
     expect(result.reason).toContain('250');
   });
 
-  it('null committer metadata with fail-on-missing=true fails with "null committer"', () => {
+  it('null committer metadata fails with "null committer"', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits: PullRequestCommit[] = [
       {
@@ -280,11 +214,7 @@ describe('verifyPolicy', () => {
       },
     ];
 
-    const result = verifyPolicy(
-      defaultInputs({ failOnMissingAuthorMetadata: true }),
-      pr,
-      commits,
-    );
+    const result = verifyPolicy(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null committer');

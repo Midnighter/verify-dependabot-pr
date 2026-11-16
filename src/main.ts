@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { createClient, fetchPullRequest, fetchAllCommits } from './github';
-import { verifyPolicy } from './policy';
+import { DEPENDABOT_ID_ON_GITHUB_COM, verifyPolicy } from './policy';
 import type { ActionInputs } from './types';
 
 function parseInputs(): ActionInputs {
@@ -23,25 +23,20 @@ function parseInputs(): ActionInputs {
     throw new Error(`expected-id must be a positive integer, got "${expectedIdRaw}".`);
   }
 
-  const allowedCommitterLoginsRaw = core.getInput('allowed-committer-logins');
-  const allowedCommitterLogins = allowedCommitterLoginsRaw
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // Only a GHES instance has its own Dependabot account.
+  if (
+    github.context.serverUrl === 'https://github.com' &&
+    expectedId !== DEPENDABOT_ID_ON_GITHUB_COM
+  ) {
+    throw new Error(
+      `expected-id must be ${DEPENDABOT_ID_ON_GITHUB_COM} on GitHub.com, got ${expectedId}. Set it only on GitHub Enterprise Server.`,
+    );
+  }
 
   return {
     githubToken: core.getInput('github-token', { required: true }),
     prNumber,
-    expectedLogin: core.getInput('expected-login'),
     expectedId,
-    requireVerifiedCommits: core.getBooleanInput('require-verified-commits'),
-    requireSameRepo: core.getBooleanInput('require-same-repo'),
-    failOnMissingAuthorMetadata: core.getBooleanInput(
-      'fail-on-missing-author-metadata',
-    ),
-    requireCommitterLoginMatch: core.getBooleanInput('require-committer-login-match'),
-    allowedCommitterLogins,
-    githubApiUrl: core.getInput('github-api-url'),
   };
 }
 
@@ -50,7 +45,7 @@ export async function run(): Promise<void> {
     const inputs = parseInputs();
 
     const { owner, repo } = github.context.repo;
-    const octokit = createClient(inputs.githubToken, inputs.githubApiUrl);
+    const octokit = createClient(inputs.githubToken);
 
     core.info(`Verifying PR #${inputs.prNumber} in ${owner}/${repo}...`);
 

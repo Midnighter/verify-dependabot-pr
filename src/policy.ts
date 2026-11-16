@@ -1,4 +1,3 @@
-import * as core from '@actions/core';
 import {
   MAX_COMMITS_PER_PR,
   type ActionInputs,
@@ -6,6 +5,14 @@ import {
   type PullRequestCommit,
   type VerificationResult,
 } from './types';
+
+export const DEPENDABOT_LOGIN = 'dependabot[bot]';
+
+/** Dependabot's account ID on GitHub.com. GHES instances have their own. */
+export const DEPENDABOT_ID_ON_GITHUB_COM = 49699333;
+
+/** GitHub's committer on the commits it creates and signs, such as Dependabot's. */
+const WEB_FLOW_LOGIN = 'web-flow';
 
 /**
  * Run all verification rules against the PR and its commits.
@@ -16,122 +23,86 @@ export function verifyPolicy(
   pr: PullRequest,
   commits: PullRequestCommit[],
 ): VerificationResult {
-  core.debug('Policy rules active:');
-  core.debug(`  expectedLogin: "${inputs.expectedLogin}"`);
-  core.debug(`  expectedId: ${inputs.expectedId}`);
-  core.debug(`  requireVerifiedCommits: ${inputs.requireVerifiedCommits}`);
-  core.debug(`  requireSameRepo: ${inputs.requireSameRepo}`);
-  core.debug(`  failOnMissingAuthorMetadata: ${inputs.failOnMissingAuthorMetadata}`);
-  core.debug(`  requireCommitterLoginMatch: ${inputs.requireCommitterLoginMatch}`);
-  core.debug(`  allowedCommitterLogins: [${inputs.allowedCommitterLogins.join(', ')}]`);
-  core.debug(`  commits to check: ${commits.length}`);
-
   const checkedCommitCount = commits.length;
+  const fail = (reason: string): VerificationResult => ({
+    verified: false,
+    reason,
+    checkedCommitCount,
+  });
 
-  // Rule 0: Non-empty commit list
   if (commits.length === 0) {
-    return { verified: false, reason: 'PR has no commits.', checkedCommitCount: 0 };
+    return fail('PR has no commits.');
   }
 
-  // Hard fail if commits hit the API maximum and verification is required
-  if (inputs.requireVerifiedCommits && commits.length >= MAX_COMMITS_PER_PR) {
-    return {
-      verified: false,
-      reason: `PR has ${commits.length} commits (API maximum ${MAX_COMMITS_PER_PR}). Cannot guarantee all commits have been verified.`,
-      checkedCommitCount,
-    };
+  if (commits.length >= MAX_COMMITS_PER_PR) {
+    return fail(
+      `PR has ${commits.length} commits (API maximum ${MAX_COMMITS_PER_PR}). Cannot guarantee all commits have been verified.`,
+    );
   }
 
-  // Rule 1: PR author login
-  if (pr.user.login !== inputs.expectedLogin) {
-    return {
-      verified: false,
-      reason: `PR author login "${pr.user.login}" does not match expected "${inputs.expectedLogin}".`,
-      checkedCommitCount,
-    };
+  if (pr.user.login !== DEPENDABOT_LOGIN) {
+    return fail(
+      `PR author login "${pr.user.login}" does not match "${DEPENDABOT_LOGIN}".`,
+    );
   }
 
-  // Rule 2: PR author account ID
+  if (pr.user.type !== 'Bot') {
+    return fail(`PR author type "${pr.user.type}" is not "Bot".`);
+  }
+
   if (pr.user.id !== inputs.expectedId) {
-    return {
-      verified: false,
-      reason: `PR author ID ${pr.user.id} does not match expected ID ${inputs.expectedId}.`,
-      checkedCommitCount,
-    };
+    return fail(
+      `PR author ID ${pr.user.id} does not match expected ID ${inputs.expectedId}.`,
+    );
   }
 
-  // Rule 3: Same-repo check
-  if (inputs.requireSameRepo) {
-    if (pr.head.repo === null) {
-      return {
-        verified: false,
-        reason:
-          'PR head repo is null (fork may have been deleted). Fork PRs are not allowed.',
-        checkedCommitCount,
-      };
-    }
-    if (pr.head.repo.full_name !== pr.base.repo.full_name) {
-      return {
-        verified: false,
-        reason: `PR head repo "${pr.head.repo.full_name}" differs from base repo "${pr.base.repo.full_name}". Fork PRs are not allowed.`,
-        checkedCommitCount,
-      };
-    }
+  // Dependabot pushes its branches to the repository itself. Compare IDs,
+  // because a repository's name can change.
+  if (pr.head.repo === null) {
+    return fail(
+      'PR head repo is null (fork may have been deleted). Fork PRs are not allowed.',
+    );
+  }
+  if (pr.head.repo.id !== pr.base.repo.id) {
+    return fail(
+      `PR head repo "${pr.head.repo.full_name}" (ID ${pr.head.repo.id}) differs from base repo "${pr.base.repo.full_name}" (ID ${pr.base.repo.id}). Fork PRs are not allowed.`,
+    );
   }
 
-  // Per-commit rules
+  // A commit's author and committer are whatever it claims, unless GitHub
+  // verified its signature, and then the committer is the key's owner. So
+  // only a verified commit with Dependabot as author and web-flow or
+  // Dependabot as committer comes from Dependabot.
   for (const commit of commits) {
-    // Rule 6: Null metadata guard (checked before login match)
-    if (inputs.failOnMissingAuthorMetadata) {
-      if (commit.author === null) {
-        return {
-          verified: false,
-          reason: `Commit ${commit.sha} has null author metadata.`,
-          checkedCommitCount,
-        };
-      }
-      if (commit.committer === null) {
-        return {
-          verified: false,
-          reason: `Commit ${commit.sha} has null committer metadata.`,
-          checkedCommitCount,
-        };
-      }
+    const { author, committer } = commit;
+    if (author === null) {
+      return fail(`Commit ${commit.sha} has null author metadata.`);
     }
-
-    // Rule 4: Commit author login
-    if (commit.author !== null && commit.author.login !== inputs.expectedLogin) {
-      return {
-        verified: false,
-        reason: `Commit ${commit.sha} author login "${commit.author.login}" does not match expected "${inputs.expectedLogin}".`,
-        checkedCommitCount,
-      };
+    if (committer === null) {
+      return fail(`Commit ${commit.sha} has null committer metadata.`);
     }
-
-    // Rule 5: Commit committer login match
-    if (inputs.requireCommitterLoginMatch && commit.committer !== null) {
-      const committerLogin = commit.committer.login;
-      if (
-        committerLogin !== inputs.expectedLogin &&
-        !inputs.allowedCommitterLogins.includes(committerLogin)
-      ) {
-        return {
-          verified: false,
-          reason: `Commit ${commit.sha} committer login "${committerLogin}" is not in the allowed list.`,
-          checkedCommitCount,
-        };
-      }
+    if (author.login !== DEPENDABOT_LOGIN) {
+      return fail(
+        `Commit ${commit.sha} author login "${author.login}" does not match "${DEPENDABOT_LOGIN}".`,
+      );
     }
-
-    // Rule 7: Commit verification
-    if (inputs.requireVerifiedCommits) {
-      if (!commit.commit.verification.verified) {
-        return {
-          verified: false,
-          reason: `Commit ${commit.sha} is not verified (reason: ${commit.commit.verification.reason}).`,
-          checkedCommitCount,
-        };
-      }
+    if (author.id !== inputs.expectedId) {
+      return fail(
+        `Commit ${commit.sha} author ID ${author.id} does not match expected ID ${inputs.expectedId}.`,
+      );
+    }
+    if (
+      committer.login !== WEB_FLOW_LOGIN &&
+      !(committer.login === DEPENDABOT_LOGIN && committer.id === inputs.expectedId)
+    ) {
+      return fail(
+        `Commit ${commit.sha} committer "${committer.login}" (ID ${committer.id}) is neither ${WEB_FLOW_LOGIN} nor Dependabot.`,
+      );
+    }
+    if (!commit.commit.verification.verified) {
+      return fail(
+        `Commit ${commit.sha} is not verified (reason: ${commit.commit.verification.reason}).`,
+      );
     }
   }
 

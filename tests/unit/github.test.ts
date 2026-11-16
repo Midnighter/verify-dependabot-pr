@@ -159,11 +159,12 @@ describe('createClient', () => {
     const mockGetOctokit = getOctokit as jest.Mock;
     mockGetOctokit.mockReturnValue({});
 
-    createClient('test-token', 'https://api.github.com');
+    createClient('test-token');
 
+    // No baseUrl, so getOctokit uses the runner's GITHUB_API_URL.
     expect(mockGetOctokit).toHaveBeenCalledWith(
       'test-token',
-      { baseUrl: 'https://api.github.com', retry: { retries: 3 } },
+      { retry: { retries: 3 } },
       expect.anything(),
     );
   });
@@ -235,6 +236,30 @@ describe('response validation', () => {
 
     await expect(fetchPullRequest(octokit, 'owner', 'repo', 42)).rejects.toThrow(
       'user missing login or id',
+    );
+  });
+
+  it.each([
+    ['head', { repo: { id: 1 } }],
+    [
+      'head.repo.id',
+      { head: { repo: { full_name: 'owner/repo' } }, base: { repo: { id: 1 } } },
+    ],
+    [
+      'base.repo.id',
+      { head: { repo: null }, base: { repo: { full_name: 'owner/repo' } } },
+    ],
+  ])('throws on invalid PR response missing %s', async (_, fields) => {
+    const octokit = buildMockOctokit({
+      prData: {
+        number: 42,
+        user: { login: 'dependabot[bot]', id: 49699333 },
+        ...fields,
+      } as unknown as PullRequest,
+    }) as MockOctokit;
+
+    await expect(fetchPullRequest(octokit, 'owner', 'repo', 42)).rejects.toThrow(
+      'head or base is incomplete',
     );
   });
 

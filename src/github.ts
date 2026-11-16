@@ -27,6 +27,27 @@ function assertPullRequest(data: unknown): asserts data is PullRequest {
   if (typeof user.login !== 'string' || typeof user.id !== 'number') {
     throw new Error('Unexpected PR response shape: user missing login or id.');
   }
+  // The policy compares these, so a missing value must not compare as equal.
+  const head = d.head as Record<string, unknown> | null | undefined;
+  const base = d.base as Record<string, unknown> | null | undefined;
+  if (
+    typeof head !== 'object' ||
+    head === null ||
+    !(head.repo === null || hasNumericId(head.repo)) ||
+    typeof base !== 'object' ||
+    base === null ||
+    !hasNumericId(base.repo)
+  ) {
+    throw new Error('Unexpected PR response shape: head or base is incomplete.');
+  }
+}
+
+function hasNumericId(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Record<string, unknown>).id === 'number'
+  );
 }
 
 /**
@@ -74,8 +95,12 @@ function checkRateLimit(headers: Record<string, string | number | undefined>): v
   }
 }
 
-export function createClient(token: string, baseUrl: string): OctokitClient {
-  return getOctokit(token, { baseUrl, retry: { retries: 3 } }, retry);
+/**
+ * The client talks to the runner's own GitHub instance: without a baseUrl,
+ * getOctokit uses GITHUB_API_URL, which workflows cannot change.
+ */
+export function createClient(token: string): OctokitClient {
+  return getOctokit(token, { retry: { retries: 3 } }, retry);
 }
 
 export async function fetchPullRequest(

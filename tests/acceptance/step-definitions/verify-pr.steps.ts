@@ -29,7 +29,6 @@ const actionDefaults: Record<string, string> = Object.fromEntries(
 // scenarios don't simulate a pull_request event, so they set the PR inputs.
 const expressionValues: Record<string, () => string> = {
   'github.token': () => '',
-  'github.api_url': () => process.env.GITHUB_API_URL ?? '',
   'github.event.pull_request.number': () => '',
 };
 

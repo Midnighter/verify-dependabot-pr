@@ -6,14 +6,7 @@
 export interface ActionInputs {
   githubToken: string;
   prNumber: number;
-  expectedLogin: string;
   expectedId: number;
-  requireVerifiedCommits: boolean;
-  requireSameRepo: boolean;
-  failOnMissingAuthorMetadata: boolean;
-  requireCommitterLoginMatch: boolean;
-  allowedCommitterLogins: string[];
-  githubApiUrl: string;
 }
 
 /** Minimal PR data needed for verification. */
@@ -26,11 +19,13 @@ export interface PullRequest {
   };
   head: {
     repo: {
+      id: number;
       full_name: string;
     } | null;
   };
   base: {
     repo: {
+      id: number;
       full_name: string;
     };
   };
