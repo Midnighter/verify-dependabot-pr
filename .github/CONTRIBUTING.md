@@ -149,12 +149,15 @@ git push origin 1.2.3
 The release workflow then checks that the tagged commit is on `main`, runs the
 lint, type check and tests, builds `dist/`, attests the build provenance of
 `dist/index.js`, commits `dist/` on top of the tagged commit, moves the tag to
-that commit, creates the GitHub Release, and moves the major version tag (e.g.
-`1`). A tag on a commit that is not on `main` fails the build. ShellCheck and
-actionlint run only in CI, because they need uv. The release commit is
-reachable only through the tags, so `main` never contains `dist/`. Afterwards,
-run `git fetch --tags --force` to update your local tag.
+that commit, and creates the GitHub Release. A tag on a commit that is not on
+`main` fails the build. ShellCheck and actionlint run only in CI, because they
+need uv. The release commit is reachable only through its tag, so `main` never
+contains `dist/`. Afterwards, run `git fetch --tags --force` to update your
+local tag.
+
+There is no major version tag such as `1`, because a tag that moves can point
+consumers at new code without their workflow changing. Consumers reference a
+release tag or its commit SHA.
 
 To try a release first, push a pre-release tag such as `1.2.3-rc.1`. The
-workflow then marks the GitHub Release as a pre-release and leaves the major
-version tag alone.
+workflow then marks the GitHub Release as a pre-release.

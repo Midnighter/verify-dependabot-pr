@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the login is always `dependabot[bot]`, and the API URL is always the runner's
   `GITHUB_API_URL`. A workflow that still passes one gets a warning from the
   runner, and the action ignores it.
+- The major version tag `0`. Releases no longer create or move a major version
+  tag, because a tag that moves can point consumers at new code without their
+  workflow changing. Reference a release tag such as `0.3.0` or its commit SHA.
 
 ### Changed
 
