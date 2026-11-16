@@ -43,4 +43,4 @@ For this action, security issues include:
 
 ## Supported Versions
 
-Only the latest major version (`v1`) receives security updates.
+Only the latest release receives security updates.

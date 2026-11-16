@@ -7,12 +7,13 @@ Securely verify that a pull request is genuinely authored by Dependabot before a
 ## Security boundary disclaimer
 
 This action verifies that a PR was opened by the official Dependabot bot account
-(by login name **and** numeric account ID) and that its commits carry valid GitHub
-signatures. It is a defence-in-depth control, not a cryptographic proof of supply
-chain integrity. An attacker who has already compromised GitHub's infrastructure
-or the Dependabot service itself is outside the threat model. Always review
-Dependabot PRs for unexpected dependency changes regardless of this action's
-result.
+(by login name, account type **and** numeric account ID), that every commit on it
+is a commit GitHub verified with Dependabot as its author, and that the result
+applies to the head commit the workflow ran for. It is a defence-in-depth
+control, not a cryptographic proof of supply chain integrity. An attacker who
+has already compromised GitHub's infrastructure or the Dependabot service itself
+is outside the threat model. Always review Dependabot PRs for unexpected
+dependency changes regardless of this action's result.
 
 ## Quickstart
 
@@ -27,9 +28,13 @@ status
 checks](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging)
 to pass before merging.
 
-Add the following step to a workflow that runs on `pull_request` events. The
-action uses the built-in `GITHUB_TOKEN` and the current PR number by default, so
-no extra configuration is required for the common case.
+Add the following workflow. On `pull_request` events the action takes the PR
+number and head commit from the event and uses the built-in `GITHUB_TOKEN`, so
+it needs no inputs. The `merge` job approves and merges only the head commit
+that the action verified.
+
+Reference the action by a release tag or, better, by the commit SHA that the tag
+points to. `main` does not contain the built action.
 
 ```yaml
 name: Auto-Merge Dependabot PR
@@ -48,18 +53,22 @@ jobs:
       contents: read
       pull-requests: read
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     # Only run for Dependabot PRs — avoids wasting API quota on human PRs.
     if: github.event.pull_request.user.login == 'dependabot[bot]'
+    outputs:
+      head-sha: ${{ steps.verify.outputs.head-sha }}
     steps:
       - name: Verify Dependabot PR
         id: verify
-        uses: Midnighter/verify-dependabot-pr@4cba4d52b24bed45b73b95d92297594694e21ac8 # v0.2.0
+        uses: Midnighter/verify-dependabot-pr@0.3.0
 
   merge:
     permissions:
       contents: write
       pull-requests: write
     runs-on: ubuntu-slim
+    timeout-minutes: 5
     needs: [verify]
     steps:
       - name: Dependabot metadata
@@ -72,107 +81,112 @@ jobs:
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor'
-        run: gh pr merge --auto --merge "$PR_URL"
+        # Fails if the PR head is no longer the verified commit.
+        run: gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ needs.verify.outputs.head-sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Approve PR
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor'
-        run: gh pr review --approve "$PR_URL"
+        # Approves the verified commit, not whatever the head is by now.
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+            -f commit_id="$HEAD_SHA" -f event=APPROVE --silent
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.verify.outputs.head-sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+Make the `verify` job a required status check (see
+[Branch protection setup](#branch-protection-setup)). A push after auto-merge
+was enabled then starts a new run, and the PR merges only if that run passes.
+
 ## Inputs
 
-| Input                             | Required | Default                                   | Description                                                                                                                                                                                                                           |
-| --------------------------------- | -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `github-token`                    | No       | `${{ github.token }}`                     | GitHub token used for REST API calls.                                                                                                                                                                                                 |
-| `pr-number`                       | No       | `${{ github.event.pull_request.number }}` | Number of the pull request to verify.                                                                                                                                                                                                 |
-| `expected-login`                  | No       | `dependabot[bot]`                         | Expected PR author login. Override when using a self-hosted Dependabot instance.                                                                                                                                                      |
-| `expected-id`                     | No       | `49699333`                                | Expected PR author numeric account ID. This ID is stable and cannot be reassigned, making it a stronger identity check than the login alone.                                                                                          |
-| `require-verified-commits`        | No       | `true`                                    | Fail if any commit in the PR lacks a verified GPG/SSH signature.                                                                                                                                                                      |
-| `require-same-repo`               | No       | `true`                                    | Fail if the PR head branch originates from a fork rather than the base repository. Set to `false` for organisations that allow Dependabot to open PRs from forks.                                                                     |
-| `fail-on-missing-author-metadata` | No       | `true`                                    | Fail if any commit is missing author or committer login metadata. This can indicate that a commit was pushed by a deleted account or via the API without identity context.                                                            |
-| `require-committer-login-match`   | No       | `false`                                   | Require every commit's committer login to equal `expected-login` or appear in `allowed-committer-logins`. Defaults to `false` because GitHub's `web-flow` bot is the recorded committer on Dependabot commits, not Dependabot itself. |
-| `allowed-committer-logins`        | No       | `web-flow`                                | Comma-separated list of logins accepted as valid committers in addition to `expected-login`. Only evaluated when `require-committer-login-match` is `true`.                                                                           |
-| `github-api-url`                  | No       | `${{ github.api_url }}`                   | GitHub REST API base URL. Override this for GitHub Enterprise Server (GHES) deployments, e.g. `https://ghes.example.com/api/v3`.                                                                                                      |
+| Input          | Required | Default                                     | Description                                                                                                                                                            |
+| -------------- | -------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token` | No       | `${{ github.token }}`                       | GitHub token used for REST API calls.                                                                                                                                  |
+| `pr-number`    | No       | `${{ github.event.pull_request.number }}`   | Number of the pull request to verify.                                                                                                                                  |
+| `head-sha`     | No       | `${{ github.event.pull_request.head.sha }}` | Head commit SHA the workflow ran for. The action fails if the PR's head is a different commit.                                                                         |
+| `expected-id`  | No       | `49699333`                                  | Dependabot's numeric account ID. Set it only on GitHub Enterprise Server, where the Dependabot account has its own ID. On GitHub.com any other value fails the action. |
+
+On `pull_request` and `pull_request_target` events the defaults are right. On
+other events, such as `workflow_dispatch`, pass `pr-number` and `head-sha`
+together.
+
+Every check is always on. Version 0.3.0 removed the inputs that turned checks
+off or changed what they compare against; see the [changelog](CHANGELOG.md). A
+workflow that still passes one gets a warning from the runner, and the action
+ignores it.
 
 ## Outputs
 
-| Output                 | Description                                             |
-| ---------------------- | ------------------------------------------------------- |
-| `verified`             | `"true"` if all checks passed; `"false"` otherwise.     |
-| `reason`               | Human-readable failure reason. Empty string on success. |
-| `checked-commit-count` | Number of commits inspected across all pages.           |
+| Output                 | Description                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `verified`             | `"true"` if all checks passed; `"false"` otherwise, including when the action stops on an error.               |
+| `reason`               | Human-readable failure reason. Empty string on success.                                                        |
+| `checked-commit-count` | Number of commits inspected across all pages.                                                                  |
+| `head-sha`             | The head commit SHA that was verified. Empty unless `verified` is `"true"`. Approve or merge only this commit. |
 
 ## Advanced examples
 
-### Relaxed mode — allow fork PRs
-
-Some organisations configure Dependabot to open PRs from a fork of the target
-repository. Disable the same-repo check in that case:
-
-```yaml
-- name: Verify Dependabot PR
-  id: verify
-  uses: Midnighter/verify-dependabot-pr@v1
-  with:
-    require-same-repo: "false"
-```
-
 ### GitHub Enterprise Server (GHES)
 
-Override the API base URL to point at your GHES instance. The token must have
-the same scopes as on GitHub.com.
+The action calls the API of the GitHub instance its runner belongs to, so it
+needs no URL. The Dependabot account has its own ID on each GHES instance. Look
+it up:
+
+```bash
+gh api --hostname ghes.example.com 'users/dependabot[bot]' --jq .id
+```
+
+and pass it as `expected-id`:
 
 ```yaml
 - name: Verify Dependabot PR
   id: verify
-  uses: Midnighter/verify-dependabot-pr@v1
+  uses: Midnighter/verify-dependabot-pr@0.3.0
   with:
-    github-api-url: https://ghes.example.com/api/v3
-    github-token: ${{ secrets.GHES_TOKEN }}
+    expected-id: "1234" # Dependabot's account ID on your instance.
 ```
 
 ### Using outputs in subsequent steps
 
-Capture the action's outputs to make downstream decisions without failing the
-workflow immediately:
+Let later steps decide what to do instead of failing the job. Pass the outputs
+to scripts through `env:` rather than writing `${{ }}` inside `run:`, so that
+their content cannot run as shell code.
 
 ```yaml
 - name: Verify Dependabot PR
   id: verify
-  uses: Midnighter/verify-dependabot-pr@v1
+  # Later steps still run; verified is "false" on any failure.
+  continue-on-error: true
+  uses: Midnighter/verify-dependabot-pr@0.3.0
 
 - name: Report verification result
   run: |
-    echo "Verified: ${{ steps.verify.outputs.verified }}"
-    echo "Commits checked: ${{ steps.verify.outputs.checked-commit-count }}"
-    echo "Reason: ${{ steps.verify.outputs.reason }}"
+    echo "Verified: ${VERIFIED}"
+    echo "Commits checked: ${COMMIT_COUNT}"
+    echo "Reason: ${REASON}"
+  env:
+    VERIFIED: ${{ steps.verify.outputs.verified }}
+    COMMIT_COUNT: ${{ steps.verify.outputs.checked-commit-count }}
+    REASON: ${{ steps.verify.outputs.reason }}
 
-- name: Auto-approve if verified
+- name: Approve the verified commit
   if: steps.verify.outputs.verified == 'true'
-  uses: hmarr/auto-approve-action@v4
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### Strict mode — enforce committer identity
-
-Enable committer login matching and restrict to a custom set of allowed bots:
-
-```yaml
-- name: Verify Dependabot PR
-  id: verify
-  uses: Midnighter/verify-dependabot-pr@v1
-  with:
-    require-committer-login-match: "true"
-    allowed-committer-logins: "web-flow,my-org-bot"
+  run: |
+    gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+      -f commit_id="$HEAD_SHA" -f event=APPROVE --silent
+  env:
+    PR_NUMBER: ${{ github.event.pull_request.number }}
+    HEAD_SHA: ${{ steps.verify.outputs.head-sha }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## Required permissions
@@ -208,20 +222,26 @@ and add the job as a required workflow under **Require workflows to pass**.
 
 This action is designed to prevent the following attack scenarios:
 
-| Scenario                                                  | Mitigated? | How                                                                          |
-| --------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------- |
-| Human pushes a PR pretending to be Dependabot by username | Yes        | Numeric account ID (`expected-id`) cannot be spoofed by a different account. |
-| Attacker creates a bot account named `dependabot`         | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.      |
-| Fork PR with a rewritten author field                     | Yes        | `require-same-repo` blocks PRs from forks by default.                        |
-| Commit pushed without a GitHub-issued signature           | Yes        | `require-verified-commits` rejects unsigned or self-signed commits.          |
-| Deleted or anonymous committer in commit metadata         | Yes        | `fail-on-missing-author-metadata` rejects commits with null login fields.    |
-| Pagination bypass — malicious commit on page 2+           | Yes        | All commit pages are fetched and checked.                                    |
-| Transient API failure causes a false pass                 | Yes        | Exponential backoff retry; failures surface as errors, not silent passes.    |
+| Scenario                                                                                                    | Mitigated? | How                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A person or another bot opens a PR under a name that looks like Dependabot's                                | Yes        | The PR author must be `dependabot[bot]`, of type `Bot`, with Dependabot's account ID.                                                                                          |
+| Attacker creates a bot account named `dependabot`                                                           | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.                                                                                                        |
+| Someone with push access adds or amends a commit on Dependabot's branch that names Dependabot as its author | Yes        | A commit counts only if GitHub verified its signature and its committer is `web-flow` or Dependabot. A commit signed with a person's own key has that person as its committer. |
+| Commit pushed without a signature                                                                           | Yes        | Every commit must have a signature that GitHub verified.                                                                                                                       |
+| Commit whose author or committer has no GitHub account                                                      | Yes        | Commits with a null author or committer are rejected.                                                                                                                          |
+| PR from a fork                                                                                              | Yes        | Head and base must be the same repository, compared by ID.                                                                                                                     |
+| A commit is pushed while the workflow runs                                                                  | Yes        | The PR head must be the `head-sha` the workflow ran for and the last listed commit. Approve and merge only the `head-sha` output.                                              |
+| Pagination bypass — malicious commit on page 2+                                                             | Yes        | All commit pages are fetched, and their count must equal the PR's commit count.                                                                                                |
+| The token is sent to another host                                                                           | Yes        | The API URL is always the runner's own `GITHUB_API_URL`.                                                                                                                       |
+| Transient API failure causes a false pass                                                                   | Yes        | Exponential backoff retry; failures set `verified` to `false` and fail the step.                                                                                               |
 
 This action does **not** protect against:
 
 - A compromised Dependabot service issuing PRs with malicious dependency updates.
 - A repository admin who grants write access to an untrusted actor.
+- A commit pushed after auto-merge was enabled, unless the job that runs this
+  action is a required status check, so that the run the push starts must pass
+  too.
 - Attacks that occur after a PR has been merged.
 
 ## Troubleshooting
@@ -230,15 +250,21 @@ This action does **not** protect against:
 
 Check the `reason` output for the specific failure. Common causes:
 
-- _Commit signature verification failed_ — The commit was rebased or amended
-  outside of Dependabot, breaking the signature. Close and let Dependabot
-  reopen the PR.
-- _PR head is from a fork_ — Your repository has `require-same-repo: true`
-  (default) but Dependabot is configured to open from a fork. Set
-  `require-same-repo: "false"` or reconfigure Dependabot.
-- _Author ID mismatch_ — The `expected-id` input was overridden and does not
-  match the actual Dependabot account ID (`49699333`). Restore the default or
-  use the correct ID for your GHES instance.
+- _A commit is not verified, or its committer is neither web-flow nor
+  Dependabot_ — Someone rebased, amended or pushed to Dependabot's branch, so
+  the commit is no longer Dependabot's. Comment `@dependabot recreate` on the PR
+  to have Dependabot rebuild it.
+- _The PR head is not the head commit that the workflow ran for_ — The PR
+  changed while the workflow ran. The push that changed it starts a new run,
+  which verifies the new head.
+- _Author ID mismatch_ — On GitHub.com, remove `expected-id`. On GHES, set it to
+  your instance's Dependabot account ID (see
+  [GitHub Enterprise Server](#github-enterprise-server-ghes)).
+
+### The action fails with `head-sha is required`
+
+The workflow does not run on a `pull_request` event. Pass `pr-number` and
+`head-sha` yourself.
 
 ### The action fails with an API rate-limit error
 
@@ -247,9 +273,9 @@ the workflow does not run too frequently.
 
 ### The action fails on GitHub Enterprise Server
 
-Set `github-api-url` to your GHES REST API base URL
-(`https://<hostname>/api/v3`). Ensure the token has `repo` scope on the GHES
-instance.
+The action calls the API of the instance its runner belongs to. Set
+`expected-id` to that instance's Dependabot account ID, and make sure the token
+can read the repository's pull requests and commits.
 
 ### `checked-commit-count` is `0`
 
@@ -258,7 +284,7 @@ with no pushes). Verify that `pr-number` resolves to a valid, non-empty PR.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards,
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, coding standards,
 and the pull request process.
 
 ## License

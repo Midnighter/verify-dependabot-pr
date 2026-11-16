@@ -14,7 +14,9 @@ inputs:
     default: ${{ github.token }}
     required: false
   pr-number:
-    description: PR number to verify.
+    description: >
+      Number of the PR to verify. On events other than pull_request, pass it
+      together with head-sha.
     default: ${{ github.event.pull_request.number }}
     required: false
   head-sha:
