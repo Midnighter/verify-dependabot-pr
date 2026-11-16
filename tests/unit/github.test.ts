@@ -219,9 +219,12 @@ describe('rate limit awareness', () => {
 });
 
 describe('response validation', () => {
-  it('throws on invalid PR response missing user', async () => {
+  it.each([
+    ['user', { number: 42, commits: 1 }],
+    ['commits', { number: 42, user: { login: 'dependabot[bot]', id: 49699333 } }],
+  ])('throws on invalid PR response missing %s', async (_, prData) => {
     const octokit = buildMockOctokit({
-      prData: { number: 42 } as unknown as PullRequest,
+      prData: prData as unknown as PullRequest,
     }) as MockOctokit;
 
     await expect(fetchPullRequest(octokit, 'owner', 'repo', 42)).rejects.toThrow(
@@ -231,7 +234,7 @@ describe('response validation', () => {
 
   it('throws on invalid PR response with user missing login', async () => {
     const octokit = buildMockOctokit({
-      prData: { number: 42, user: { id: 123 } } as unknown as PullRequest,
+      prData: { number: 42, commits: 1, user: { id: 123 } } as unknown as PullRequest,
     }) as MockOctokit;
 
     await expect(fetchPullRequest(octokit, 'owner', 'repo', 42)).rejects.toThrow(
@@ -260,6 +263,7 @@ describe('response validation', () => {
     const octokit = buildMockOctokit({
       prData: {
         number: 42,
+        commits: 1,
         user: { login: 'dependabot[bot]', id: 49699333 },
         ...fields,
       } as unknown as PullRequest,

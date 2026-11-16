@@ -22,7 +22,11 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
 /** pr_dependabot.json with its head moved to the last of these commits. */
 function prEndingAt(commits: PullRequestCommit[]): PullRequest {
   const pr = loadFixture<PullRequest>('pr_dependabot.json');
-  return { ...pr, head: { ...pr.head, sha: commits[commits.length - 1].sha } };
+  return {
+    ...pr,
+    commits: commits.length,
+    head: { ...pr.head, sha: commits[commits.length - 1].sha },
+  };
 }
 
 describe('verifyPolicy', () => {

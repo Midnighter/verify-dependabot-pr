@@ -13,6 +13,8 @@ export interface ActionInputs {
 /** Minimal PR data needed for verification. */
 export interface PullRequest {
   number: number;
+  /** Total number of commits on the PR, as GitHub counts them. */
+  commits: number;
   user: {
     login: string;
     id: number;

@@ -16,11 +16,12 @@ function assertPullRequest(data: unknown): asserts data is PullRequest {
     typeof d !== 'object' ||
     d === null ||
     typeof d.number !== 'number' ||
+    typeof d.commits !== 'number' ||
     typeof d.user !== 'object' ||
     d.user === null
   ) {
     throw new Error(
-      'Unexpected PR response shape: missing required fields (number, user).',
+      'Unexpected PR response shape: missing required fields (number, commits, user).',
     );
   }
   const user = d.user as Record<string, unknown>;

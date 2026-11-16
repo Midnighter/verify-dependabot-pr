@@ -40,6 +40,13 @@ export function verifyPolicy(
     );
   }
 
+  // Catches a list cut short by the API and a push between the two API calls.
+  if (commits.length !== pr.commits) {
+    return fail(
+      `PR has ${pr.commits} commits, but the API listed ${commits.length}. Not every commit could be checked.`,
+    );
+  }
+
   if (pr.user.login !== DEPENDABOT_LOGIN) {
     return fail(
       `PR author login "${pr.user.login}" does not match "${DEPENDABOT_LOGIN}".`,
