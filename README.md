@@ -44,8 +44,7 @@ on:
     types: [opened, synchronize, reopened]
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   verify:
@@ -273,7 +272,7 @@ Check the `reason` output for the specific failure. Common causes:
   your instance's Dependabot account ID (see
   [GitHub Enterprise Server](#github-enterprise-server-ghes)).
 
-### The action fails with `head-sha is required`
+### The action fails with `pr-number is required` or `head-sha is required`
 
 The workflow does not run on a `pull_request` event. Pass `pr-number` and
 `head-sha` yourself.
@@ -291,8 +290,9 @@ can read the repository's pull requests and commits.
 
 ### `checked-commit-count` is `0`
 
-The PR has no commits (e.g. the PR number is incorrect or the PR is a draft
-with no pushes). Verify that `pr-number` resolves to a valid, non-empty PR.
+The API listed no commits for the PR, and `reason` says `PR has no commits.`
+This happens when the PR's branch adds nothing to its base branch. A wrong
+`pr-number` that points to no PR fails with an API error instead.
 
 ## Contributing
 
