@@ -4,3 +4,7 @@ lib/
 coverage/
 *.tgz
 .DS_Store
+
+# Scratch files an Amp agent writes while working in an orb. The tracked
+# plugin under .amp/plugins/ stays in the repository.
+.amp/in/
