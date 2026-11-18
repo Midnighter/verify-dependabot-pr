@@ -40,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency on `github/codeql-action`, which it used for the SARIF upload this
   repository declines. The audit now covers `action.yml` as well as the
   workflows, through a new `lint:zizmor` script.
+- The zizmor audit also runs weekly, and on request through
+  `workflow_dispatch`. Several of its audits report on facts that live upstream
+  rather than in this repository, such as an action's repository being
+  archived, an advisory published against an action, or a tag that has moved
+  off the commit it named; none of those change this repository, so no pull
+  request runs the audit against them. The job now passes `GH_TOKEN`, because
+  without a token zizmor runs offline and skips every online audit with only a
+  warning. Its `paths` filter also covers `action.yml` and
+  `.github/tool-requirements.txt`, which the audit now depends on.
 
 ### Removed
 

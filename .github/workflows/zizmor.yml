@@ -5,6 +5,17 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/**"
+      - "action.yml"
+      - ".github/tool-requirements.txt"
+  # Several of zizmor's audits report on facts that live upstream rather than in
+  # this repository: an action's repository being archived, a published advisory
+  # against an action, a tag that has moved off the commit it named. None of
+  # those change this repository, so no pull request runs the audit against
+  # them. The weekly run does. Wednesday, so it does not land on the Tuesday
+  # Scorecard analysis.
+  schedule:
+    - cron: "15 11 * * 3"
+  workflow_dispatch: {}
 
 permissions: {}
 
@@ -14,6 +25,11 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      # Without a token zizmor runs offline and skips every online audit, with
+      # only a warning, so the scheduled run would check nothing it cannot
+      # already check on a pull request.
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
