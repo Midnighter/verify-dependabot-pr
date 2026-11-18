@@ -22,3 +22,17 @@ updates:
       - ci
     cooldown:
       default-days: 14
+
+  # The tool versions in .github/tool-requirements.txt, which the checks pass to
+  # `uvx --constraints`.
+  - package-ecosystem: pip
+    directory: /.github
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - ci
+    cooldown:
+      default-days: 14
+      semver-major-days: 21

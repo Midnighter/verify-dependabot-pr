@@ -34,9 +34,12 @@ the approach.
 
 ## Development setup
 
-Node.js 24 or later is required. The shell script and workflow linters run
-through [uv](https://docs.astral.sh/uv/)'s `uvx`, which fetches the pinned
-ShellCheck and actionlint versions on first use.
+Node.js 24 or later is required. The shell script, workflow and workflow
+security linters run through [uv](https://docs.astral.sh/uv/)'s `uvx`, which
+fetches them on first use. Their versions are pinned in
+`.github/tool-requirements.txt`, which each command passes to
+`uvx --constraints`, so the version lives in one place and Dependabot's `pip`
+ecosystem updates it. Edit that file to change a tool version.
 
 ```bash
 # Install dependencies (clean install — matches CI exactly).
@@ -61,6 +64,7 @@ Individual steps:
 npm run lint            # ESLint
 npm run lint:shell      # ShellCheck on scripts/
 npm run lint:workflows  # actionlint (and ShellCheck on `run:` steps) on workflows
+npm run lint:zizmor     # zizmor on the workflows and action.yml
 npm run format:check    # Prettier (`npm run format` rewrites the files)
 npm run typecheck       # TypeScript strict type checking (no emit)
 npm run test            # Jest unit tests with coverage

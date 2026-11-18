@@ -19,12 +19,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: astral-sh/setup-uv@v10.3.3
+
+      # Runs zizmor directly rather than through zizmorcore/zizmor-action, so
+      # that its version lives in .github/tool-requirements.txt where Dependabot
+      # updates it. `--format=github` reports findings as annotations, the same
+      # as the action's `annotations: true`; the action's SARIF upload would need
+      # `security-events: write`. zizmor exits non-zero on any finding, so the
+      # job still fails. Mirrors the `lint:zizmor` npm script, spelled out here
+      # because this job installs uv but no Node.
       - name: Audit the workflows
-        uses: zizmorcore/zizmor-action@v0.8.1
-        with:
-          # Pinned so that CI audits with a known zizmor version.
-          version: 1.32.0
-          inputs: .github/workflows
-          # Report as annotations; uploading SARIF would need `security-events: write`.
-          advanced-security: false
-          annotations: true
+        run: >-
+          uvx --constraints .github/tool-requirements.txt --from zizmor zizmor
+          --format=github .github/workflows action.yml
