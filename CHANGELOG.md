@@ -27,6 +27,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   artifact. The bundle itself is unchanged: building `993497a` without the
   lint and test steps reproduces the published 0.3.0 bundle byte for byte.
 
+### Removed
+
+- `DEPENDABOT_ACTION_PLAN.md`. It described the design before 0.3.0 and still
+  recommended a moving `@v1` tag, the `github-api-url` input and
+  `require-same-repo: false`, all of which 0.3.0 removed. `README.md` documents
+  the inputs, outputs and threat model, and `.github/CONTRIBUTING.md` the
+  release process.
+- `.github/release-drafter.yml`. No workflow used it, and its `v`-prefixed tag
+  template contradicted the release workflow's tag patterns.
+- The `version` field in `package.json`, which said `1.0.0` while the latest
+  release was `0.3.0`. Nothing reads it: the action is distributed by git tag,
+  not published to npm, so the field was a second source of truth that could
+  only drift. The package is now marked `private`.
+
 ## [0.3.0] - 2026-11-16
 
 ### Security
