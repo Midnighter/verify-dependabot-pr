@@ -4,6 +4,21 @@ import { createClient, fetchPullRequest, fetchAllCommits } from './github';
 import { DEPENDABOT_ID_ON_GITHUB_COM, verifyPolicy } from './policy';
 import type { ActionInputs } from './types';
 
+/**
+ * Parse a whole number greater than zero, or return null.
+ *
+ * parseInt stops at the first character it cannot read, so it turns "12abc"
+ * into 12 and "1e3" into 1. An input GitHub never produces means the workflow
+ * passed something unintended, so reject it rather than act on a prefix.
+ */
+function parsePositiveInteger(raw: string): number | null {
+  if (!/^\d+$/.test(raw.trim())) {
+    return null;
+  }
+  const value = Number(raw.trim());
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function parseInputs(): ActionInputs {
   const prNumberRaw = core.getInput('pr-number');
   if (!prNumberRaw) {
@@ -12,8 +27,8 @@ function parseInputs(): ActionInputs {
     );
   }
 
-  const prNumber = parseInt(prNumberRaw, 10);
-  if (isNaN(prNumber) || prNumber <= 0) {
+  const prNumber = parsePositiveInteger(prNumberRaw);
+  if (prNumber === null) {
     throw new Error(`pr-number must be a positive integer, got "${prNumberRaw}".`);
   }
 
@@ -25,8 +40,8 @@ function parseInputs(): ActionInputs {
   }
 
   const expectedIdRaw = core.getInput('expected-id');
-  const expectedId = parseInt(expectedIdRaw, 10);
-  if (isNaN(expectedId) || expectedId <= 0) {
+  const expectedId = parsePositiveInteger(expectedIdRaw);
+  if (expectedId === null) {
     throw new Error(`expected-id must be a positive integer, got "${expectedIdRaw}".`);
   }
 
