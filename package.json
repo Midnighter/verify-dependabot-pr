@@ -1,6 +1,6 @@
 {
   "name": "verify-dependabot-pr",
-  "version": "1.0.0",
+  "private": true,
   "description": "Securely verify that a pull request is genuinely authored by Dependabot",
   "license": "Apache-2.0",
   "engines": {
