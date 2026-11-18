@@ -26,6 +26,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   linter or test dependency runs in the job that produces the attested
   artifact. The bundle itself is unchanged: building `993497a` without the
   lint and test steps reproduces the published 0.3.0 bundle byte for byte.
+- The versions of ShellCheck, actionlint and zizmor live in
+  `.github/tool-requirements.txt`, which every command passes to
+  `uvx --constraints`. Dependabot's `pip` ecosystem updates that file, so these
+  tools no longer need a hand-edited version string. `gh-actions-lock` is
+  pinned with `--pin v0.4.1` in the workflow, because it is not a Python or npm
+  package and Dependabot has no ecosystem for `gh` extensions; it still needs a
+  human to raise it.
+- The workflow security job runs the zizmor CLI instead of
+  `zizmorcore/zizmor-action`, so zizmor's version comes from the requirements
+  file. `--format=github` reports the same annotations, and zizmor's non-zero
+  exit still fails the job. Dropping the action also drops its transitive
+  dependency on `github/codeql-action`, which it used for the SARIF upload this
+  repository declines. The audit now covers `action.yml` as well as the
+  workflows, through a new `lint:zizmor` script.
 
 ### Removed
 

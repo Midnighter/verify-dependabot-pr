@@ -42,15 +42,15 @@ export default function (amp: PluginAPI) {
 
     // Run in a login shell so uvx and gh from `~/.local/bin` are on PATH. When a file
     // under `.github/workflows/` differs from HEAD (staged, unstaged, or untracked),
-    // also run the Workflow Security job's zizmor audit, with the version it pins,
-    // and the CI `lockfile` job. Not only staged files: the checks run before git
-    // does, so files the same command stages are not staged yet.
+    // also run the Workflow Security job's zizmor audit, which takes its version from
+    // `.github/tool-requirements.txt`, and the CI `lockfile` job. Not only staged
+    // files: the checks run before git does, so files the same command stages are not
+    // staged yet.
     const script = `
       cd "$1" || exit 1
       shift
       if [ -n "$(git status --porcelain -- .github/workflows)" ]; then
-        zizmor_version="$(sed -n 's/^ *version: *//p' .github/workflows/zizmor.yml)"
-        set -- "$@" "uvx zizmor@$zizmor_version .github/workflows" "gh actions-lock --verify"
+        set -- "$@" "npm run lint:zizmor" "gh actions-lock --verify"
       fi
       failed=0
       for check in "$@"; do

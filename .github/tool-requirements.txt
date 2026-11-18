@@ -1,0 +1,11 @@
+# Versions of the Python-packaged tools the checks run, kept here so that
+# Dependabot's pip ecosystem updates them. Callers pass this file to
+# `uvx --constraints`, which binds the version of the tool they name, so the
+# version lives in one place instead of in each command.
+#
+# The `gh-actions-lock` extension is pinned in .github/workflows/checks.yml
+# instead: it is not a Python package, and Dependabot has no ecosystem for gh
+# extensions.
+actionlint-py==1.7.12.25
+shellcheck-py==0.11.0.1
+zizmor==1.32.0
