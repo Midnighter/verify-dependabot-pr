@@ -1,0 +1,61 @@
+name: Checks
+
+# The repository's checks, in one place, called by CI for every push and pull
+# request and by the release workflow before it builds. Nothing here produces a
+# release artifact: the release workflow's build job installs only the npm
+# packages and runs esbuild, so a compromised linter or test dependency cannot
+# reach the bundle that gets attested.
+
+on:
+  workflow_dispatch: {}
+  workflow_call: {}
+
+permissions: {}
+
+jobs:
+  ci:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [24, 26]
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: npm ci --ignore-scripts
+      - run: npm audit --omit=dev
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run lint:shell
+      - run: npm run lint:workflows
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test
+      # Builds here only to prove the bundle compiles. The release workflow
+      # builds the artifact it ships in a job of its own.
+      - run: npm run build
+
+  # Fails when .github/workflows/actions.lock is out of sync with the
+  # workflows or a locked pin no longer verifies upstream.
+  lockfile:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: gh extension install github/gh-actions-lock
+      - run: gh actions-lock --verify

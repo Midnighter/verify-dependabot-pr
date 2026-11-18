@@ -10,7 +10,18 @@ on:
 permissions: {}
 
 jobs:
+  checks:
+    # The same checks CI runs, as a gate before anything is built.
+    uses: $/.github/workflows/checks.yml
+    permissions:
+      contents: read
+
   build:
+    # Produces the bundle that gets attested and released, so it runs as little
+    # as possible: npm ci and esbuild, and no linter, test runner or cache. A
+    # compromised dev dependency can only reach the artifact from this job, and
+    # the attestation covers provenance, not what the toolchain did.
+    needs: [checks]
     runs-on: ubuntu-slim
     timeout-minutes: 15
     permissions:
@@ -36,11 +47,6 @@ jobs:
           package-manager-cache: false
       # The bundle is built without running dependency install scripts.
       - run: npm ci --ignore-scripts
-      # CI runs the ShellCheck and actionlint checks on main. They need uv, and
-      # this job installs nothing beyond the npm packages.
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test
       - run: npm run build
       - uses: actions/upload-artifact@v7.0.2
         with:

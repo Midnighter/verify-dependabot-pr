@@ -146,14 +146,19 @@ git tag 1.2.3
 git push origin 1.2.3
 ```
 
-The release workflow then checks that the tagged commit is on `main`, runs the
-lint, type check and tests, builds `dist/`, attests the build provenance of
-`dist/index.js`, commits `dist/` on top of the tagged commit, moves the tag to
-that commit, and creates the GitHub Release. A tag on a commit that is not on
-`main` fails the build. ShellCheck and actionlint run only in CI, because they
-need uv. The release commit is reachable only through its tag, so `main` never
+The release workflow then runs the same checks CI runs, by calling
+`.github/workflows/checks.yml`. Once they pass it checks that the tagged commit
+is on `main`, builds `dist/`, attests the build provenance of `dist/index.js`,
+commits `dist/` on top of the tagged commit, moves the tag to that commit, and
+creates the GitHub Release. A tag on a commit that is not on `main` fails the
+build. The release commit is reachable only through its tag, so `main` never
 contains `dist/`. Afterwards, run `git fetch --tags --force` to update your
 local tag.
+
+The job that builds the bundle runs only `npm ci --ignore-scripts` and
+`npm run build`. The linters and the test suite run in the `checks` job, which
+produces no artifact, so a compromised development dependency cannot alter the
+bundle that gets attested and released.
 
 There is no major version tag such as `1`, because a tag that moves can point
 consumers at new code without their workflow changing. Consumers reference a

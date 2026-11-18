@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pr-number` and `expected-id` must be whole numbers. Before, values such as
   `12abc`, `42.9` and `1e3` were read as `12`, `42` and `1`, so the action
   could check a different pull request than the workflow named.
+- The checks live in one reusable workflow, `.github/workflows/checks.yml`,
+  which both CI and the release workflow call. The job that builds the released
+  bundle now runs only `npm ci --ignore-scripts` and `npm run build`, so no
+  linter or test dependency runs in the job that produces the attested
+  artifact. The bundle itself is unchanged: building `993497a` without the
+  lint and test steps reproduces the published 0.3.0 bundle byte for byte.
 
 ## [0.3.0] - 2026-11-16
 
