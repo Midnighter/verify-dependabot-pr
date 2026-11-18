@@ -9,46 +9,9 @@ on:
 permissions: {}
 
 jobs:
-  ci:
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
+  checks:
+    # `$/` pins the called workflow to this workflow's own commit, so a pull
+    # request runs the checks as that branch defines them.
+    uses: $/.github/workflows/checks.yml
     permissions:
       contents: read
-    strategy:
-      matrix:
-        node-version: [24, 26]
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: npm
-      - uses: astral-sh/setup-uv@v10.3.3
-      - run: npm ci --ignore-scripts
-      - run: npm audit --omit=dev
-      - run: npm audit --audit-level=high
-      - run: npm run lint
-      - run: npm run lint:shell
-      - run: npm run lint:workflows
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
-
-  # Fails when .github/workflows/actions.lock is out of sync with the
-  # workflows or a locked pin no longer verifies upstream.
-  lockfile:
-    runs-on: ubuntu-slim
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - run: gh extension install github/gh-actions-lock
-      - run: gh actions-lock --verify

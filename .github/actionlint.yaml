@@ -1,0 +1,15 @@
+# actionlint configuration.
+#
+# Reusable workflows in this repository are called with GitHub's
+# self-repository syntax, `uses: $/.github/workflows/<name>.yml`. actionlint
+# 1.7.12.25 does not know that form yet and reports it as malformed. zizmor's
+# `self-repository` audit requires it over the workspace-relative `./` form,
+# because `./` resolves against the runner's filesystem and so can load a
+# workflow that an earlier step cloned, and because GitHub treats only `$/` as
+# pinned when enforcing policy.
+#
+# Remove this once actionlint accepts `$/`.
+paths:
+  .github/workflows/**:
+    ignore:
+      - 'reusable workflow call "\$/\.github/workflows/.+\.yml" at "uses" is not following the format'
