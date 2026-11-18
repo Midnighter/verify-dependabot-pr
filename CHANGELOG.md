@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- On GitHub.com a commit whose committer claims the login `web-flow` must also
+  have web-flow's account ID, 19864447. A GitHub Enterprise Server instance has
+  its own web-flow account, so there only the login is compared.
+- A commit counts as verified only when `verification.verified` is exactly
+  `true`, not merely a value that looks true.
+
+### Changed
+
+- `pr-number` and `expected-id` must be whole numbers. Before, values such as
+  `12abc`, `42.9` and `1e3` were read as `12`, `42` and `1`, so the action
+  could check a different pull request than the workflow named.
+
 ## [0.3.0] - 2026-11-16
 
 ### Security

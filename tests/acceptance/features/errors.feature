@@ -29,6 +29,28 @@ Feature: Failing closed on invalid input and API errors
     Then the action fails with a message containing "expected-id must be a positive integer"
     And the "verified" output is "false"
 
+  # parseInt reads a number off the front of these and ignores the rest, so the
+  # action used to check a PR the workflow never named.
+  Scenario Outline: A PR number that is not a whole number fails the action
+    Given the "pr-number" input is "<value>"
+    When the action runs
+    Then the action fails with a message containing "pr-number must be a positive integer"
+    And the "verified" output is "false"
+
+    Examples:
+      | value |
+      | 12abc |
+      | 42.9  |
+      | 1e3   |
+      | 0     |
+      | -1    |
+
+  Scenario: An expected-id with trailing characters fails the action
+    Given the "expected-id" input is "49699333x"
+    When the action runs
+    Then the action fails with a message containing "expected-id must be a positive integer"
+    And the "verified" output is "false"
+
   Scenario: Non-Error exception is handled gracefully
     Given the GitHub API throws a non-Error value "string-error"
     When the action runs

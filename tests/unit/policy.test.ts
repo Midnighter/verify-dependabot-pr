@@ -158,6 +158,63 @@ describe('verifyPolicy', () => {
     expect(result.reason).toContain('evil-bot');
   });
 
+  it('a committer claiming web-flow with another account ID fails on GitHub.com', () => {
+    const pr = loadFixture<PullRequest>('pr_dependabot.json');
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
+    const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
+      ...c,
+      committer: { login: 'web-flow', id: 1000001 },
+    }));
+
+    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain(
+      'committer "web-flow" has ID 1000001, not 19864447',
+    );
+  });
+
+  it("on GHES web-flow keeps the instance's own account ID", () => {
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified_ghes.json');
+    const pr = loadFixture<PullRequest>('pr_dependabot.json');
+    const ghesPr: PullRequest = {
+      ...pr,
+      commits: commits.length,
+      user: { ...pr.user, id: 1000002 },
+      head: { ...pr.head, sha: commits[commits.length - 1].sha },
+    };
+
+    const result = verifyPolicy(
+      defaultInputs({ expectedId: 1000002 }),
+      ghesPr,
+      commits,
+    );
+
+    expect(result.verified).toBe(true);
+    expect(result.reason).toBe('');
+  });
+
+  it('a commit whose verified field is not exactly true fails', () => {
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
+    const modifiedCommits: PullRequestCommit[] = commits.map((c) => ({
+      ...c,
+      commit: {
+        ...c.commit,
+        // A malformed response: truthy, but not the boolean the API documents.
+        verification: { verified: 'yes' as unknown as boolean, reason: 'valid' },
+      },
+    }));
+
+    const result = verifyPolicy(
+      defaultInputs(),
+      prEndingAt(modifiedCommits),
+      modifiedCommits,
+    );
+
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('is not verified');
+  });
+
   it('empty commits array fails with "no commits"', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
 

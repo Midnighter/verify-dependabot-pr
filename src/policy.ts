@@ -15,6 +15,13 @@ export const DEPENDABOT_ID_ON_GITHUB_COM = 49699333;
 const WEB_FLOW_LOGIN = 'web-flow';
 
 /**
+ * web-flow's account ID on GitHub.com. A GHES instance has its own web-flow
+ * account with its own ID, which we cannot know, so this is only checked when
+ * the run is on GitHub.com.
+ */
+const WEB_FLOW_ID_ON_GITHUB_COM = 19864447;
+
+/**
  * Run all verification rules against the PR and its commits.
  * Returns the first failure or a success result.
  */
@@ -29,6 +36,10 @@ export function verifyPolicy(
     reason,
     checkedCommitCount,
   });
+
+  // main.ts rejects any other expected-id on GitHub.com, so this ID means the
+  // run is there, where web-flow's own ID is known too.
+  const onGitHubCom = inputs.expectedId === DEPENDABOT_ID_ON_GITHUB_COM;
 
   if (commits.length === 0) {
     return fail('PR has no commits.');
@@ -118,7 +129,18 @@ export function verifyPolicy(
         `Commit ${commit.sha} committer "${committer.login}" (ID ${committer.id}) is neither ${WEB_FLOW_LOGIN} nor Dependabot.`,
       );
     }
-    if (!commit.commit.verification.verified) {
+    // On GitHub.com web-flow's ID is known, so require it as well as the
+    // login. On GHES the instance has its own web-flow account.
+    if (
+      onGitHubCom &&
+      committer.login === WEB_FLOW_LOGIN &&
+      committer.id !== WEB_FLOW_ID_ON_GITHUB_COM
+    ) {
+      return fail(
+        `Commit ${commit.sha} committer "${WEB_FLOW_LOGIN}" has ID ${committer.id}, not ${WEB_FLOW_ID_ON_GITHUB_COM}.`,
+      );
+    }
+    if (commit.commit.verification.verified !== true) {
       return fail(
         `Commit ${commit.sha} is not verified (reason: ${commit.commit.verification.reason}).`,
       );
