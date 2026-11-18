@@ -9,6 +9,11 @@
 #   3. Check every commit on the PR with the action's rules: verified,
 #      authored by Dependabot, committed by web-flow or Dependabot, and the
 #      last one is the commit that passed the checks.
+#
+#      These rules are a copy of the action's, not a call to it: the action
+#      verifies this repository's own Dependabot PRs only once it is built and
+#      released, so gating them on it would let a bad change to src/policy.ts
+#      block the PRs that fix it. Keep the two in step by hand.
 #   4. Approve that commit and fast-forward main to it
 #      (git push origin <sha>:refs/heads/main) - no merge commit, no squash,
 #      preserving dependabot's original signature.
@@ -32,18 +37,22 @@ REBASE_TIMEOUT=300 # seconds to wait for dependabot's rebase push
 REBASE_POLL=10     # seconds between polls
 CHECKS_TIMEOUT=120 # seconds to wait for CI runs to be registered after a push
 DEPENDABOT_ID=49699333
+MAX_COMMITS=250 # most commits the API lists for a PR; see src/types.ts
 
-# Succeeds when the PR's commits end at the given SHA and each one is a commit
-# GitHub verified with Dependabot as author and web-flow or Dependabot as
-# committer: the same rules as the action.
+# Succeeds when the PR has at least one commit and fewer than the API's
+# maximum, the list holds every commit the PR claims, it ends at the given
+# SHA, and each commit is one GitHub verified with Dependabot as author and
+# web-flow or Dependabot as committer.
 check_commits() {
   local pr=$1 head=$2 total
   total=$(gh api "repos/${REPO}/pulls/${pr}" --jq .commits)
   gh api --paginate --slurp "repos/${REPO}/pulls/${pr}/commits?per_page=100" |
     jq --exit-status --arg head "${head}" --argjson total "${total}" \
-      --argjson id "${DEPENDABOT_ID}" '
+      --argjson id "${DEPENDABOT_ID}" --argjson max "${MAX_COMMITS}" '
       add
-      | length == $total
+      | length > 0
+        and length < $max
+        and length == $total
         and .[-1].sha == $head
         and all(.[];
           .author.login == "dependabot[bot]" and .author.id == $id
@@ -56,11 +65,15 @@ check_commits() {
 for pr in "${PR_NUMBERS[@]}"; do
   echo "== PR #${pr} =="
 
+  # head.repo is null when the PR comes from a deleted fork, so give it a
+  # placeholder that cannot equal the base repo's ID.
   pr_data=$(gh api "repos/${REPO}/pulls/${pr}" \
-    --jq '[.head.ref, (.user.id | tostring), .state, .base.ref, .head.repo.full_name] | @tsv')
-  IFS=$'\t' read -r branch author_id state base_ref head_repo <<<"${pr_data}"
+    --jq '[.head.ref, (.user.id | tostring), .user.type, .state, .base.ref,
+           (.head.repo.id // "none" | tostring), (.base.repo.id | tostring)] | @tsv')
+  IFS=$'\t' read -r branch author_id author_type state base_ref head_repo_id base_repo_id <<<"${pr_data}"
 
-  if [[ "${author_id}" != "${DEPENDABOT_ID}" || "${state}" != "open" || "${base_ref}" != "main" || "${head_repo,,}" != "${REPO,,}" ]]; then
+  # Compare repositories by ID, because a repository can be renamed.
+  if [[ "${author_id}" != "${DEPENDABOT_ID}" || "${author_type}" != "Bot" || "${state}" != "open" || "${base_ref}" != "main" || "${head_repo_id}" != "${base_repo_id}" ]]; then
     echo "  skipping PR #${pr}: not an open, same-repository Dependabot PR targeting main"
     continue
   fi
