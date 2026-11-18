@@ -76,6 +76,14 @@ severity in the runtime dependencies that the action bundles, and
 `npm audit --audit-level=high`, which fails on high or critical vulnerabilities
 in any dependency.
 
+`npm run lint:zizmor` runs offline unless a GitHub token is in the environment,
+and says so in a warning. Offline it skips the audits that query GitHub, such as
+whether an action's repository has been archived or has an advisory against it.
+Set `GH_TOKEN` to run those too, as the Workflow Security job does. That job
+runs on pull requests that touch the workflows, weekly on a schedule so the
+upstream facts are rechecked even when nothing here changes, and on request
+through **Actions → Workflow Security → Run workflow**.
+
 [Amp](https://ampcode.com/) agents run the same checks before every commit
 through the project plugin `.amp/plugins/pre-commit-checks.ts`. When a workflow
 changed, the plugin also runs zizmor and `gh actions-lock --verify`, so it needs
