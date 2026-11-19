@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without a token zizmor runs offline and skips every online audit with only a
   warning. Its `paths` filter also covers `action.yml` and
   `.github/tool-requirements.txt`, which the audit now depends on.
+- A `live` job in the checks workflow runs the built action against this
+  repository's own pull requests, through `scripts/verify_live_prs.sh`. The unit
+  and acceptance suites mock the GitHub API, so they confirm the policy matches
+  our model of GitHub rather than GitHub itself, and cannot catch a rule
+  tightened until it rejects genuine Dependabot pull requests. Because it runs
+  `dist/index.js`, it also covers input parsing and the step outputs.
 
 ### Removed
 
