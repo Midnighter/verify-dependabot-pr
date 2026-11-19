@@ -1,7 +1,11 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { createClient, fetchPullRequest, fetchAllCommits } from './github';
-import { DEPENDABOT_ID_ON_GITHUB_COM, verifyPolicy } from './policy';
+import {
+  DEPENDABOT_ID_ON_GITHUB_COM,
+  WEB_FLOW_ID_ON_GITHUB_COM,
+  verifyPolicy,
+} from './policy';
 import type { ActionInputs } from './types';
 
 /**
@@ -45,14 +49,28 @@ function parseInputs(): ActionInputs {
     throw new Error(`expected-id must be a positive integer, got "${expectedIdRaw}".`);
   }
 
-  // Only a GHES instance has its own Dependabot account.
-  if (
-    github.context.serverUrl === 'https://github.com' &&
-    expectedId !== DEPENDABOT_ID_ON_GITHUB_COM
-  ) {
+  const expectedWebFlowIdRaw = core.getInput('expected-web-flow-id');
+  const expectedWebFlowId = parsePositiveInteger(expectedWebFlowIdRaw);
+  if (expectedWebFlowId === null) {
     throw new Error(
-      `expected-id must be ${DEPENDABOT_ID_ON_GITHUB_COM} on GitHub.com, got ${expectedId}. Set it only on GitHub Enterprise Server.`,
+      `expected-web-flow-id must be a positive integer, got "${expectedWebFlowIdRaw}".`,
     );
+  }
+
+  // Only a GHES instance has its own accounts. The runner sets GITHUB_SERVER_URL
+  // to its own instance and workflows cannot change it, so it, and not the value
+  // of an input, decides which instance this is.
+  if (github.context.serverUrl === 'https://github.com') {
+    if (expectedId !== DEPENDABOT_ID_ON_GITHUB_COM) {
+      throw new Error(
+        `expected-id must be ${DEPENDABOT_ID_ON_GITHUB_COM} on GitHub.com, got ${expectedId}. Set it only on GitHub Enterprise Server.`,
+      );
+    }
+    if (expectedWebFlowId !== WEB_FLOW_ID_ON_GITHUB_COM) {
+      throw new Error(
+        `expected-web-flow-id must be ${WEB_FLOW_ID_ON_GITHUB_COM} on GitHub.com, got ${expectedWebFlowId}. Set it only on GitHub Enterprise Server.`,
+      );
+    }
   }
 
   return {
@@ -60,6 +78,7 @@ function parseInputs(): ActionInputs {
     prNumber,
     headSha,
     expectedId,
+    expectedWebFlowId,
   };
 }
 
