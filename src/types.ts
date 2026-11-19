@@ -8,6 +8,7 @@ export interface ActionInputs {
   prNumber: number;
   headSha: string;
   expectedId: number;
+  expectedWebFlowId: number;
 }
 
 /** Minimal PR data needed for verification. */

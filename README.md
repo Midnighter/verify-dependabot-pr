@@ -107,12 +107,13 @@ was enabled then starts a new run, and the PR merges only if that run passes.
 
 ## Inputs
 
-| Input          | Required | Default                                     | Description                                                                                                                                                            |
-| -------------- | -------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `github-token` | No       | `${{ github.token }}`                       | GitHub token used for REST API calls.                                                                                                                                  |
-| `pr-number`    | No       | `${{ github.event.pull_request.number }}`   | Number of the pull request to verify.                                                                                                                                  |
-| `head-sha`     | No       | `${{ github.event.pull_request.head.sha }}` | Head commit SHA the workflow ran for. The action fails if the PR's head is a different commit.                                                                         |
-| `expected-id`  | No       | `49699333`                                  | Dependabot's numeric account ID. Set it only on GitHub Enterprise Server, where the Dependabot account has its own ID. On GitHub.com any other value fails the action. |
+| Input                  | Required | Default                                     | Description                                                                                                                                                                                         |
+| ---------------------- | -------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `github-token`         | No       | `${{ github.token }}`                       | GitHub token used for REST API calls.                                                                                                                                                               |
+| `pr-number`            | No       | `${{ github.event.pull_request.number }}`   | Number of the pull request to verify.                                                                                                                                                               |
+| `head-sha`             | No       | `${{ github.event.pull_request.head.sha }}` | Head commit SHA the workflow ran for. The action fails if the PR's head is a different commit.                                                                                                      |
+| `expected-id`          | No       | `49699333`                                  | Dependabot's numeric account ID. Set it only on GitHub Enterprise Server, where the Dependabot account has its own ID. On GitHub.com any other value fails the action.                              |
+| `expected-web-flow-id` | No       | `19864447`                                  | The account ID of `web-flow`, which GitHub signs its own commits as. Set it only on GitHub Enterprise Server, which has its own `web-flow` account. On GitHub.com any other value fails the action. |
 
 On `pull_request` and `pull_request_target` events the defaults are right. On
 other events, such as `workflow_dispatch`, pass `pr-number` and `head-sha`
@@ -137,14 +138,11 @@ ignores it.
 ### GitHub Enterprise Server (GHES)
 
 The action calls the API of the GitHub instance its runner belongs to, so it
-needs no URL. The Dependabot account has its own ID on each GHES instance. Look
-it up:
+needs no URL. Two accounts have their own ID on each GHES instance, and the
+action needs both:
 
-```bash
-gh api --hostname ghes.example.com 'users/dependabot[bot]' --jq .id
-```
-
-and pass it as `expected-id`:
+- Dependabot, which authors the commits, as `expected-id`.
+- `web-flow`, which GitHub signs its own commits as, as `expected-web-flow-id`.
 
 ```yaml
 - name: Verify Dependabot PR
@@ -152,7 +150,32 @@ and pass it as `expected-id`:
   uses: Midnighter/verify-dependabot-pr@0.3.0
   with:
     expected-id: "1234" # Dependabot's account ID on your instance.
+    expected-web-flow-id: "5678" # web-flow's account ID on your instance.
 ```
+
+> [!IMPORTANT]
+> **Ask your instance administrator for these two IDs.** It is tempting to look
+> them up by name:
+>
+> ```bash
+> gh api --hostname ghes.example.com 'users/web-flow' --jq .id
+> ```
+>
+> That inverts what the action is for. The action exists because an account
+> name proves nothing: GitHub works out a commit's author and committer from
+> the email addresses written into the commit, so a commit can name any
+> account. A name lookup answers "which ID does the account _called_ `web-flow`
+> have", so a wrong answer would be trusted as readily as a right one.
+>
+> It matters most for `web-flow`, an ordinary account name that anyone on the
+> instance may have registered before GitHub's signing account did. A lookup
+> would return that account's ID, and the action would then accept its commits.
+> `dependabot[bot]` is safer, because GitHub reserves the `[bot]` suffix for
+> app accounts, but the IDs are worth confirming with someone who administers
+> the instance rather than taking from an API that answers by name.
+>
+> On GitHub.com neither input needs setting: both IDs are fixed, and the action
+> rejects any other value.
 
 ### Using outputs in subsequent steps
 
@@ -233,18 +256,18 @@ and add the job as a required workflow under **Require workflows to pass**.
 
 This action is designed to prevent the following attack scenarios:
 
-| Scenario                                                                                                    | Mitigated? | How                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A person or another bot opens a PR under a name that looks like Dependabot's                                | Yes        | The PR author must be `dependabot[bot]`, of type `Bot`, with Dependabot's account ID.                                                                                          |
-| Attacker creates a bot account named `dependabot`                                                           | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.                                                                                                        |
-| Someone with push access adds or amends a commit on Dependabot's branch that names Dependabot as its author | Yes        | A commit counts only if GitHub verified its signature and its committer is `web-flow` or Dependabot. A commit signed with a person's own key has that person as its committer. |
-| Commit pushed without a signature                                                                           | Yes        | Every commit must have a signature that GitHub verified.                                                                                                                       |
-| Commit whose author or committer has no GitHub account                                                      | Yes        | Commits with a null author or committer are rejected.                                                                                                                          |
-| PR from a fork                                                                                              | Yes        | Head and base must be the same repository, compared by ID.                                                                                                                     |
-| A commit is pushed while the workflow runs                                                                  | Yes        | The PR head must be the `head-sha` the workflow ran for and the last listed commit. Approve and merge only the `head-sha` output.                                              |
-| Pagination bypass — malicious commit on page 2+                                                             | Yes        | All commit pages are fetched, and their count must equal the PR's commit count.                                                                                                |
-| The token is sent to another host                                                                           | Yes        | The API URL is always the runner's own `GITHUB_API_URL`.                                                                                                                       |
-| Transient API failure causes a false pass                                                                   | Yes        | Exponential backoff retry; failures set `verified` to `false` and fail the step.                                                                                               |
+| Scenario                                                                                                    | Mitigated? | How                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A person or another bot opens a PR under a name that looks like Dependabot's                                | Yes        | The PR author must be `dependabot[bot]`, of type `Bot`, with Dependabot's account ID.                                                                                                                          |
+| Attacker creates a bot account named `dependabot`                                                           | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.                                                                                                                                        |
+| Someone with push access adds or amends a commit on Dependabot's branch that names Dependabot as its author | Yes        | A commit counts only if GitHub verified its signature and its committer is `web-flow` or Dependabot, by account ID as well as login. A commit signed with a person's own key has that person as its committer. |
+| Commit pushed without a signature                                                                           | Yes        | Every commit must have a signature that GitHub verified.                                                                                                                                                       |
+| Commit whose author or committer has no GitHub account                                                      | Yes        | Commits with a null author or committer are rejected.                                                                                                                                                          |
+| PR from a fork                                                                                              | Yes        | Head and base must be the same repository, compared by ID.                                                                                                                                                     |
+| A commit is pushed while the workflow runs                                                                  | Yes        | The PR head must be the `head-sha` the workflow ran for and the last listed commit. Approve and merge only the `head-sha` output.                                                                              |
+| Pagination bypass — malicious commit on page 2+                                                             | Yes        | All commit pages are fetched, and their count must equal the PR's commit count.                                                                                                                                |
+| The token is sent to another host                                                                           | Yes        | The API URL is always the runner's own `GITHUB_API_URL`.                                                                                                                                                       |
+| Transient API failure causes a false pass                                                                   | Yes        | Exponential backoff retry; failures set `verified` to `false` and fail the step.                                                                                                                               |
 
 This action does **not** protect against:
 
@@ -271,6 +294,11 @@ Check the `reason` output for the specific failure. Common causes:
 - _Author ID mismatch_ — On GitHub.com, remove `expected-id`. On GHES, set it to
   your instance's Dependabot account ID (see
   [GitHub Enterprise Server](#github-enterprise-server-ghes)).
+- _Committer `web-flow` has ID X, not Y_ — On GitHub.com, remove
+  `expected-web-flow-id`. On GHES, set it to your instance's `web-flow` account
+  ID. If the two IDs in the message are both plausible accounts on your
+  instance, treat it as a finding rather than a misconfiguration: one of them is
+  not the account GitHub signs commits as.
 
 ### The action fails with `pr-number is required` or `head-sha is required`
 

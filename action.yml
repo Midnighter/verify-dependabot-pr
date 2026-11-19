@@ -32,6 +32,14 @@ inputs:
       be 49699333.
     default: "49699333"
     required: false
+  expected-web-flow-id:
+    description: >
+      The numeric account ID of web-flow, the account GitHub signs its own
+      commits as. Set it only on GitHub Enterprise Server, which has its own
+      web-flow account; on GitHub.com it must be 19864447. Ask your instance
+      administrator for the ID rather than looking it up by name.
+    default: "19864447"
+    required: false
 
 outputs:
   verified:

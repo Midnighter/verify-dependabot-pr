@@ -14,12 +14,8 @@ export const DEPENDABOT_ID_ON_GITHUB_COM = 49699333;
 /** GitHub's committer on the commits it creates and signs, such as Dependabot's. */
 const WEB_FLOW_LOGIN = 'web-flow';
 
-/**
- * web-flow's account ID on GitHub.com. A GHES instance has its own web-flow
- * account with its own ID, which we cannot know, so this is only checked when
- * the run is on GitHub.com.
- */
-const WEB_FLOW_ID_ON_GITHUB_COM = 19864447;
+/** web-flow's account ID on GitHub.com. GHES instances have their own. */
+export const WEB_FLOW_ID_ON_GITHUB_COM = 19864447;
 
 /**
  * Run all verification rules against the PR and its commits.
@@ -36,10 +32,6 @@ export function verifyPolicy(
     reason,
     checkedCommitCount,
   });
-
-  // main.ts rejects any other expected-id on GitHub.com, so this ID means the
-  // run is there, where web-flow's own ID is known too.
-  const onGitHubCom = inputs.expectedId === DEPENDABOT_ID_ON_GITHUB_COM;
 
   if (commits.length === 0) {
     return fail('PR has no commits.');
@@ -129,15 +121,15 @@ export function verifyPolicy(
         `Commit ${commit.sha} committer "${committer.login}" (ID ${committer.id}) is neither ${WEB_FLOW_LOGIN} nor Dependabot.`,
       );
     }
-    // On GitHub.com web-flow's ID is known, so require it as well as the
-    // login. On GHES the instance has its own web-flow account.
+    // The login alone proves nothing: GitHub resolves it from the commit's
+    // email, so a commit can claim web-flow as its committer. Only the account
+    // ID pins it to the instance's real signing account.
     if (
-      onGitHubCom &&
       committer.login === WEB_FLOW_LOGIN &&
-      committer.id !== WEB_FLOW_ID_ON_GITHUB_COM
+      committer.id !== inputs.expectedWebFlowId
     ) {
       return fail(
-        `Commit ${commit.sha} committer "${WEB_FLOW_LOGIN}" has ID ${committer.id}, not ${WEB_FLOW_ID_ON_GITHUB_COM}.`,
+        `Commit ${commit.sha} committer "${WEB_FLOW_LOGIN}" has ID ${committer.id}, not ${inputs.expectedWebFlowId}.`,
       );
     }
     if (commit.commit.verification.verified !== true) {

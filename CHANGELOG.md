@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- On GitHub.com a commit whose committer claims the login `web-flow` must also
-  have web-flow's account ID, 19864447. A GitHub Enterprise Server instance has
-  its own web-flow account, so there only the login is compared.
+- A commit whose committer claims the login `web-flow` must also have that
+  account's ID: 19864447 on GitHub.com, and on GitHub Enterprise Server the ID
+  of the instance's own `web-flow` account, given in the new
+  `expected-web-flow-id` input. A login alone is not evidence, because GitHub
+  resolves it from the email addresses written into the commit.
+- Which instance the action runs on is read from the runner's
+  `GITHUB_SERVER_URL`, which workflows cannot change, rather than inferred from
+  the value of `expected-id`. A GHES instance whose Dependabot account happens
+  to hold GitHub.com's account ID is no longer mistaken for GitHub.com, which
+  had made it reject its own genuine Dependabot pull requests.
 - A commit counts as verified only when `verification.verified` is exactly
   `true`, not merely a value that looks true.
 

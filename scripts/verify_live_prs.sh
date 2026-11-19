@@ -26,21 +26,41 @@
 set -euo pipefail
 
 REPO="Midnighter/verify-dependabot-pr"
-DEPENDABOT_ID=49699333
 
 # Merged Dependabot pull requests, each frozen at its head commit.
 VERIFIED_PRS=(98 97 96 94 93)
 # A pull request a person opened, which must not verify.
 REJECTED_PR=104
 
+# Every input's literal default from action.yml, as INPUT_* assignments, so that
+# adding an input does not leave this check running with inputs a real workflow
+# would never have. Defaults holding a `${{ }}` expression are skipped; the
+# per-PR values below supply those.
+# shellcheck disable=SC2016  # This is JavaScript; shell must not expand it.
+readonly ACTION_DEFAULTS_SCRIPT='
+const { parse } = require("yaml");
+const { inputs } = parse(require("fs").readFileSync("action.yml", "utf-8"));
+for (const [name, input] of Object.entries(inputs)) {
+  const value = input.default;
+  if (value === undefined || String(value).includes("${{")) continue;
+  process.stdout.write(`INPUT_${name.toUpperCase()}=${value}\0`);
+}
+'
+
 if [[ ! -f dist/index.js ]]; then
   echo "dist/index.js is missing; run npm run build first." >&2
   exit 2
 fi
+
 if [[ -z "${GH_TOKEN:-}" ]]; then
   echo "GH_TOKEN is not set." >&2
   exit 2
 fi
+
+action_defaults=()
+while IFS= read -r -d '' assignment; do
+  action_defaults+=("${assignment}")
+done < <(node --input-type=commonjs -e "${ACTION_DEFAULTS_SCRIPT}")
 
 failed=0
 
@@ -57,14 +77,14 @@ check_pr() {
   # The action exits non-zero when it does not verify, which is not a failure
   # of this script, so the exit status is ignored and the outputs are read
   # instead.
-  env GITHUB_REPOSITORY="${REPO}" \
+  env "${action_defaults[@]}" \
+    GITHUB_REPOSITORY="${REPO}" \
     GITHUB_SERVER_URL="https://github.com" \
     GITHUB_API_URL="https://api.github.com" \
     GITHUB_OUTPUT="${outputs}" \
     "INPUT_GITHUB-TOKEN=${GH_TOKEN}" \
     "INPUT_PR-NUMBER=${pr}" \
     "INPUT_HEAD-SHA=${head}" \
-    "INPUT_EXPECTED-ID=${DEPENDABOT_ID}" \
     node dist/index.js >"${log}" 2>&1 || true
 
   # GITHUB_OUTPUT holds `name<<delimiter`, the value, then the delimiter again.

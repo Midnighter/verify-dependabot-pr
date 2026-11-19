@@ -175,6 +175,14 @@ const steps: StepDefinitions = ({ given, when, then }) => {
     world.commits = loadFixture(name) as unknown[];
   });
 
+  // The value is JSON, as for the PR field step. Applies to every commit, so a
+  // scenario can vary one field without needing its own fixture.
+  given(/^every commit field "(.*)" is (.*)$/, (fieldPath: string, value: string) => {
+    for (const commit of world.commits) {
+      setField(commit as Record<string, unknown>, fieldPath, JSON.parse(value));
+    }
+  });
+
   given(/^the GitHub API throws a non-Error value "(.*)"$/, (value: string) => {
     world.throwNonError = value;
   });

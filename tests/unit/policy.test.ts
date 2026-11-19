@@ -15,6 +15,7 @@ function defaultInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     prNumber: 42,
     headSha: 'def456',
     expectedId: 49699333,
+    expectedWebFlowId: 19864447,
     ...overrides,
   };
 }
@@ -185,13 +186,41 @@ describe('verifyPolicy', () => {
     };
 
     const result = verifyPolicy(
-      defaultInputs({ expectedId: 1000002 }),
+      defaultInputs({ expectedId: 1000002, expectedWebFlowId: 1000003 }),
       ghesPr,
       commits,
     );
 
     expect(result.verified).toBe(true);
     expect(result.reason).toBe('');
+  });
+
+  it("on GHES a committer claiming web-flow with another ID fails, whatever Dependabot's ID is", () => {
+    const commits = loadFixture<PullRequestCommit[]>('commits_verified_ghes.json');
+    const pr = loadFixture<PullRequest>('pr_dependabot.json');
+    const ghesPr: PullRequest = {
+      ...pr,
+      commits: commits.length,
+      user: { ...pr.user, id: 1000002 },
+      head: { ...pr.head, sha: commits[commits.length - 1].sha },
+    };
+
+    // The instance's web-flow is 1000003; this commit claims the login with
+    // GitHub.com's ID, which the old inference accepted because the run was
+    // not recognised as GitHub.com.
+    const spoofed: PullRequestCommit[] = commits.map((c) => ({
+      ...c,
+      committer: { login: 'web-flow', id: 19864447 },
+    }));
+
+    const result = verifyPolicy(
+      defaultInputs({ expectedId: 1000002, expectedWebFlowId: 1000003 }),
+      ghesPr,
+      spoofed,
+    );
+
+    expect(result.verified).toBe(false);
+    expect(result.reason).toContain('has ID 19864447, not 1000003');
   });
 
   it('a commit whose verified field is not exactly true fails', () => {
