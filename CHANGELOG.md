@@ -62,6 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   our model of GitHub rather than GitHub itself, and cannot catch a rule
   tightened until it rejects genuine Dependabot pull requests. Because it runs
   `dist/index.js`, it also covers input parsing and the step outputs.
+- The merge script's copy of the commit rules is covered by two checks. Its jq
+  filter moved to `scripts/dependabot_commits.jq`, and
+  `tests/unit/merge-script.test.ts` runs the same fixtures through that filter
+  and through `verifyPolicy` and fails when their verdicts disagree, so the
+  copy cannot silently lose a rule as it had before.
+  `scripts/verify_merge_rules.sh` runs the script itself against crafted pull
+  requests with `gh` and `git` stubbed, checking which it merges and which it
+  skips. The filter also gained the two rules the action had already: the
+  committer's `web-flow` account ID, and `verification.verified` being exactly
+  `true`.
 
 ### Removed
 

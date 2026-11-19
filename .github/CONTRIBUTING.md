@@ -69,6 +69,7 @@ npm run format:check    # Prettier (`npm run format` rewrites the files)
 npm run typecheck       # TypeScript strict type checking (no emit)
 npm run test            # Jest unit tests with coverage
 npm run test:live       # the built action against this repo's real PRs
+npm run test:merge-script # the merge script against stubbed gh and git
 npm run build           # esbuild bundle → dist/
 ```
 
@@ -121,6 +122,27 @@ GH_TOKEN=$(gh auth token) npm run test:live
 The `live` job in `.github/workflows/checks.yml` runs it on every push and pull
 request. Add an anchor when a rule starts depending on something no fixture
 models, such as the shape of a real commit message.
+
+### The merge script
+
+`scripts/merge_dependabot_prs.sh` re-implements the commit rules in jq rather
+than calling the action, so that a bad change to `src/policy.ts` cannot block
+the pull requests that would fix it. Two checks keep that copy honest:
+
+- `tests/unit/merge-script.test.ts` runs the same fixtures through
+  `scripts/dependabot_commits.jq`, the filter the script itself runs, and
+  through `verifyPolicy`, and fails when the two disagree. A rule added to one
+  has to be added to the other.
+- `scripts/verify_merge_rules.sh` runs the script against crafted pull requests
+  with `gh` and `git` stubbed, checking which ones it merges and which it skips.
+
+```bash
+npm run test:merge-script
+```
+
+The drift test can only catch a difference that one of its cases distinguishes.
+When you add a rule, add a case where the two implementations would disagree
+without it; a rule no case exercises is a rule the test cannot police.
 
 ## Code style
 

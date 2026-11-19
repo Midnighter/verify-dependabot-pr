@@ -13,7 +13,9 @@
 #      These rules are a copy of the action's, not a call to it: the action
 #      verifies this repository's own Dependabot PRs only once it is built and
 #      released, so gating them on it would let a bad change to src/policy.ts
-#      block the PRs that fix it. Keep the two in step by hand.
+#      block the PRs that fix it. They live in dependabot_commits.jq, and
+#      tests/unit/merge-script.test.ts fails when they and src/policy.ts
+#      disagree, so the copy cannot drift unnoticed.
 #   4. Approve that commit and fast-forward main to it
 #      (git push origin <sha>:refs/heads/main) - no merge commit, no squash,
 #      preserving dependabot's original signature.
@@ -37,7 +39,22 @@ REBASE_TIMEOUT=300 # seconds to wait for dependabot's rebase push
 REBASE_POLL=10     # seconds between polls
 CHECKS_TIMEOUT=120 # seconds to wait for CI runs to be registered after a push
 DEPENDABOT_ID=49699333
-MAX_COMMITS=250 # most commits the API lists for a PR; see src/types.ts
+WEB_FLOW_ID=19864447 # the account GitHub signs its own commits as
+MAX_COMMITS=250      # most commits the API lists for a PR; see src/types.ts
+
+COMMIT_FILTER="$(dirname "${BASH_SOURCE[0]}")/dependabot_commits.jq"
+
+# Applies the commit rules in dependabot_commits.jq to a commit list on stdin.
+# Separate from check_commits so that a test can feed it a fixture, and so the
+# rules live in one file shared with the test that compares them against
+# src/policy.ts.
+check_commit_list() {
+  local head=$1 total=$2
+  jq --exit-status --arg head "${head}" --argjson total "${total}" \
+    --argjson id "${DEPENDABOT_ID}" --argjson web_flow_id "${WEB_FLOW_ID}" \
+    --argjson max "${MAX_COMMITS}" \
+    --from-file "${COMMIT_FILTER}" >/dev/null
+}
 
 # Succeeds when the PR has at least one commit and fewer than the API's
 # maximum, the list holds every commit the PR claims, it ends at the given
@@ -47,19 +64,7 @@ check_commits() {
   local pr=$1 head=$2 total
   total=$(gh api "repos/${REPO}/pulls/${pr}" --jq .commits)
   gh api --paginate --slurp "repos/${REPO}/pulls/${pr}/commits?per_page=100" |
-    jq --exit-status --arg head "${head}" --argjson total "${total}" \
-      --argjson id "${DEPENDABOT_ID}" --argjson max "${MAX_COMMITS}" '
-      add
-      | length > 0
-        and length < $max
-        and length == $total
-        and .[-1].sha == $head
-        and all(.[];
-          .author.login == "dependabot[bot]" and .author.id == $id
-          and .commit.verification.verified
-          and (.committer.login == "web-flow"
-            or (.committer.login == "dependabot[bot]" and .committer.id == $id)))' \
-      >/dev/null
+    check_commit_list "${head}" "${total}"
 }
 
 for pr in "${PR_NUMBERS[@]}"; do

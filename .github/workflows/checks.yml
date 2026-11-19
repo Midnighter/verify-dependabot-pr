@@ -40,6 +40,8 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run test
+      # Stubs gh and git, so it needs no token and reaches no network.
+      - run: npm run test:merge-script
       # Builds here only to prove the bundle compiles. The release workflow
       # builds the artifact it ships in a job of its own.
       - run: npm run build
