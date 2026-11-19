@@ -11,6 +11,7 @@
     "test": "jest --coverage",
     "test:unit": "jest --selectProjects unit",
     "test:acceptance": "jest --selectProjects acceptance",
+    "test:live": "scripts/verify_live_prs.sh",
     "lint": "eslint .",
     "lint:shell": "uvx --constraints .github/tool-requirements.txt --from shellcheck-py shellcheck scripts/*.sh",
     "lint:workflows": "uvx --constraints .github/tool-requirements.txt --from actionlint-py --with shellcheck-py actionlint",

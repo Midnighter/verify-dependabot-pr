@@ -44,6 +44,32 @@ jobs:
       # builds the artifact it ships in a job of its own.
       - run: npm run build
 
+  # Runs the built action against this repository's own pull requests. The unit
+  # and acceptance suites mock the API, so they cannot catch a rule tightened
+  # until it rejects genuine Dependabot PRs; this job can. It needs no write
+  # access and makes two API calls per pull request it checks.
+  live:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Checks the bundle consumers run, not src/, so input parsing and the
+      # step outputs are covered too.
+      - run: npm run build
+      - run: scripts/verify_live_prs.sh
+
   # Fails when .github/workflows/actions.lock is out of sync with the
   # workflows or a locked pin no longer verifies upstream.
   lockfile:

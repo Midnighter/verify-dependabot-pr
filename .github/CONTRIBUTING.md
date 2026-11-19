@@ -68,6 +68,7 @@ npm run lint:zizmor     # zizmor on the workflows and action.yml
 npm run format:check    # Prettier (`npm run format` rewrites the files)
 npm run typecheck       # TypeScript strict type checking (no emit)
 npm run test            # Jest unit tests with coverage
+npm run test:live       # the built action against this repo's real PRs
 npm run build           # esbuild bundle → dist/
 ```
 
@@ -91,9 +92,11 @@ the `gh actions-lock` extension (see [GitHub Actions](#github-actions)).
 
 ## Testing
 
-Tests live alongside the source in `src/` and use [Jest](https://jestjs.io/)
-with `ts-jest`. Fixture data (mock API responses) is stored under
-`__fixtures__/`.
+Tests live under `tests/` and use [Jest](https://jestjs.io/) with `ts-jest`.
+Fixture data (mock API responses) is stored under `__fixtures__/`. The `unit`
+project tests `verifyPolicy` and the API client directly; the `acceptance`
+project drives the whole action through Gherkin scenarios in
+`tests/acceptance/features/`.
 
 ```bash
 npm test
@@ -102,6 +105,22 @@ npm test
 Coverage is collected automatically. Aim to keep branch coverage high for any
 new code paths, particularly around error handling and edge cases in API
 responses.
+
+Both projects mock the GitHub API, so they confirm the policy matches our model
+of GitHub rather than GitHub itself. `scripts/verify_live_prs.sh` closes that
+gap: it runs the built `dist/index.js` against this repository's own pull
+requests and checks the verdict, so it also covers input parsing and the step
+outputs. Merged Dependabot pull requests are the anchors, because an open one
+moves whenever Dependabot rebases it.
+
+```bash
+npm run build
+GH_TOKEN=$(gh auth token) npm run test:live
+```
+
+The `live` job in `.github/workflows/checks.yml` runs it on every push and pull
+request. Add an anchor when a rule starts depending on something no fixture
+models, such as the shape of a real commit message.
 
 ## Code style
 
