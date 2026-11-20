@@ -75,12 +75,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and acceptance suites mock the GitHub API, so they confirm the policy matches
   our model of GitHub rather than GitHub itself, and cannot catch a rule
   tightened until it rejects genuine Dependabot pull requests. Because it runs
-  `dist/index.js`, it also covers input parsing and the step outputs.
+  `dist/index.js`, it also covers input parsing and the step outputs. Its
+  anchors are the newest merged Dependabot pull requests, chosen at run time:
+  the new push check reads the repository's activity, which goes back a limited
+  time, so a written-down list of pull requests would eventually fail the check
+  for being old rather than for a regression. The selection asks only what a
+  pull request is, never what the action makes of it, and finding too few fails
+  rather than verifying nothing.
 - The maintainer script `scripts/merge_dependabot_prs.sh` no longer carries a
   copy of the action's commit rules. It fast-forwards `main` onto Dependabot
-  pull requests that have already been reviewed, and the action itself checks
-  every pull request, so the copy added nothing that was relied on while
-  drifting from `src/policy.ts` twice. What the script still checks is
+  pull requests that have already been reviewed by hand, which is the check the
+  copy stood in for, so it added nothing that was relied on while drifting from
+  `src/policy.ts` twice. Its header and
+  [CONTRIBUTING.md](.github/CONTRIBUTING.md) now say that reading the diff is
+  the only authenticity check in the merge path: no workflow here runs this
+  action on this repository's own pull requests. What the script still checks is
   mechanical: that the pull request is an open, same-repository Dependabot pull
   request targeting `main`, and that it approves and pushes the exact commit
   whose checks passed. `scripts/verify_merge_script.sh` covers those decisions
