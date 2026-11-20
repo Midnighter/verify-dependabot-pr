@@ -82,9 +82,14 @@ in any dependency.
 and says so in a warning. Offline it skips the audits that query GitHub, such as
 whether an action's repository has been archived or has an advisory against it.
 Set `GH_TOKEN` to run those too, as the Workflow Security job does. That job
-runs on pull requests that touch the workflows, weekly on a schedule so the
-upstream facts are rechecked even when nothing here changes, and on request
-through **Actions → Workflow Security → Run workflow**.
+runs on every pull request, weekly on a schedule so the upstream facts are
+rechecked even when nothing here changes, and on request through
+**Actions → Workflow Security → Run workflow**.
+
+It has no `paths` filter, deliberately. It is a required status check on `main`,
+and a workflow skipped by a paths filter leaves its check pending rather than
+passing, so a required check that can be skipped blocks every pull request the
+filter does not match.
 
 [Amp](https://ampcode.com/) agents run the same checks before every commit
 through the project plugin `.amp/plugins/pre-commit-checks.ts`. When a workflow

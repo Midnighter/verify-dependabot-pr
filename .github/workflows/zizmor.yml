@@ -1,17 +1,17 @@
 name: Workflow Security
 
 on:
+  # Every pull request, with no paths filter, because this job is a required
+  # status check on main. A workflow skipped by a paths filter leaves its check
+  # pending rather than passing, so a required check that can be skipped blocks
+  # every pull request the filter does not match.
   pull_request:
     branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - "action.yml"
-      - ".github/tool-requirements.txt"
   # Several of zizmor's audits report on facts that live upstream rather than in
   # this repository: an action's repository being archived, a published advisory
   # against an action, a tag that has moved off the commit it named. None of
-  # those change this repository, so no pull request runs the audit against
-  # them. The weekly run does. Wednesday, so it does not land on the Tuesday
+  # those change this repository, so nothing a pull request does brings them to
+  # light. The weekly run does. Wednesday, so it does not land on the Tuesday
   # Scorecard analysis.
   schedule:
     - cron: "15 11 * * 3"
@@ -26,9 +26,10 @@ jobs:
     permissions:
       contents: read
     env:
-      # Without a token zizmor runs offline and skips every online audit, with
-      # only a warning, so the scheduled run would check nothing it cannot
-      # already check on a pull request.
+      # Without a token zizmor runs offline and skips every online audit with
+      # only a warning, which would leave both the weekly run and every pull
+      # request checking less than they appear to. The audits only read, so a
+      # read-only token is enough.
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7.0.1

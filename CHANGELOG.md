@@ -52,10 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than in this repository, such as an action's repository being
   archived, an advisory published against an action, or a tag that has moved
   off the commit it named; none of those change this repository, so no pull
-  request runs the audit against them. The job now passes `GH_TOKEN`, because
-  without a token zizmor runs offline and skips every online audit with only a
-  warning. Its `paths` filter also covers `action.yml` and
-  `.github/tool-requirements.txt`, which the audit now depends on.
+  request brings them to light. The job now passes `GH_TOKEN`, because without
+  a token zizmor runs offline and skips every online audit with only a warning.
+  It also runs on every pull request rather than only those touching the
+  workflows: it is a required status check on `main`, and a workflow skipped by
+  a `paths` filter leaves its check pending rather than passing, which would
+  block every pull request the filter did not match.
 - A `live` job in the checks workflow runs the built action against this
   repository's own pull requests, through `scripts/verify_live_prs.sh`. The unit
   and acceptance suites mock the GitHub API, so they confirm the policy matches
