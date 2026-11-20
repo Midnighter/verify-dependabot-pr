@@ -3,6 +3,7 @@ import {
   type ActionInputs,
   type PullRequest,
   type PullRequestCommit,
+  type RepositoryActivity,
   type VerificationResult,
 } from './types';
 
@@ -25,6 +26,7 @@ export function verifyPolicy(
   inputs: ActionInputs,
   pr: PullRequest,
   commits: PullRequestCommit[],
+  newestPush: RepositoryActivity | null,
 ): VerificationResult {
   const checkedCommitCount = commits.length;
   const fail = (reason: string): VerificationResult => ({
@@ -137,6 +139,37 @@ export function verifyPolicy(
         `Commit ${commit.sha} is not verified (reason: ${commit.commit.verification.reason}).`,
       );
     }
+  }
+
+  // Every check so far reads the commit's own metadata, and none of that
+  // metadata is false on a squash merge: GitHub makes Dependabot the author,
+  // signs the result as web-flow, and does so whatever commits the PR held. So
+  // the commit cannot be told apart from Dependabot's own, and the remaining
+  // signal is who put it on the branch.
+  if (newestPush === null) {
+    return fail(
+      `No push to "${pr.head.ref}" is recorded, so who put ${pr.head.sha} on the branch cannot be established.`,
+    );
+  }
+  if (newestPush.actor === null) {
+    return fail(`The newest push to "${pr.head.ref}" has no actor metadata.`);
+  }
+  if (newestPush.actor.login !== DEPENDABOT_LOGIN) {
+    return fail(
+      `The newest push to "${pr.head.ref}" was made by "${newestPush.actor.login}", not ${DEPENDABOT_LOGIN}.`,
+    );
+  }
+  if (newestPush.actor.id !== inputs.expectedId) {
+    return fail(
+      `The newest push to "${pr.head.ref}" was made by an account with Dependabot's login but account ID ${newestPush.actor.id}, not ${inputs.expectedId}.`,
+    );
+  }
+  // Dependabot pushing the branch is not enough: the branch can since have been
+  // pointed at another commit that Dependabot once pushed elsewhere.
+  if (newestPush.after !== pr.head.sha) {
+    return fail(
+      `The newest push to "${pr.head.ref}" ended at ${newestPush.after}, not at the head commit ${pr.head.sha}.`,
+    );
   }
 
   return { verified: true, reason: '', checkedCommitCount };

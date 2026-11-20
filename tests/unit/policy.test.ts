@@ -1,5 +1,11 @@
 import { verifyPolicy } from '../../src/policy';
-import type { ActionInputs, PullRequest, PullRequestCommit } from '../../src/types';
+import type {
+  ActionInputs,
+  PullRequest,
+  PullRequestCommit,
+  RepositoryActivity,
+  VerificationResult,
+} from '../../src/types';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -30,12 +36,33 @@ function prEndingAt(commits: PullRequestCommit[]): PullRequest {
   };
 }
 
+/** Dependabot's own push, ending at the PR's head commit. */
+function dependabotPush(pr: PullRequest, actorId: number): RepositoryActivity {
+  return {
+    activity_type: 'force_push',
+    after: pr.head.sha,
+    actor: { login: 'dependabot[bot]', id: actorId },
+  };
+}
+
+/**
+ * verifyPolicy with the newest push already right, so that each case below
+ * fails for the rule it is about rather than for the push.
+ */
+function verifyWithPush(
+  inputs: ActionInputs,
+  pr: PullRequest,
+  commits: PullRequestCommit[],
+): VerificationResult {
+  return verifyPolicy(inputs, pr, commits, dependabotPush(pr, inputs.expectedId));
+}
+
 describe('verifyPolicy', () => {
   it('happy path — verified PR with verified commits passes', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(true);
     expect(result.reason).toBe('');
@@ -50,7 +77,7 @@ describe('verifyPolicy', () => {
     };
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), modifiedPr, commits);
+    const result = verifyWithPush(defaultInputs(), modifiedPr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('does not match');
@@ -61,7 +88,7 @@ describe('verifyPolicy', () => {
     const modifiedPr: PullRequest = { ...pr, user: { ...pr.user, type: 'User' } };
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), modifiedPr, commits);
+    const result = verifyWithPush(defaultInputs(), modifiedPr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('type "User"');
@@ -71,7 +98,7 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_impersonator.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('ID');
@@ -81,7 +108,7 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_fork.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('Fork');
@@ -91,7 +118,7 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_deleted_fork.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_verified.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
@@ -102,7 +129,7 @@ describe('verifyPolicy', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
     const commits = loadFixture<PullRequestCommit[]>('commits_unverified.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('not verified');
@@ -112,7 +139,7 @@ describe('verifyPolicy', () => {
     const commits = loadFixture<PullRequestCommit[]>('commits_null_author.json');
     const pr = prEndingAt(commits);
 
-    const result = verifyPolicy(defaultInputs({ headSha: 'abc123' }), pr, commits);
+    const result = verifyWithPush(defaultInputs({ headSha: 'abc123' }), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null');
@@ -126,7 +153,7 @@ describe('verifyPolicy', () => {
       committer: { login: 'dependabot[bot]', id: 49699333 },
     }));
 
-    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+    const result = verifyWithPush(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(true);
   });
@@ -139,7 +166,7 @@ describe('verifyPolicy', () => {
       committer: { login: 'dependabot[bot]', id: 1000001 },
     }));
 
-    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+    const result = verifyWithPush(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('committer "dependabot[bot]" (ID 1000001)');
@@ -153,7 +180,7 @@ describe('verifyPolicy', () => {
       committer: { login: 'evil-bot', id: 99999 },
     }));
 
-    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+    const result = verifyWithPush(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('evil-bot');
@@ -167,7 +194,7 @@ describe('verifyPolicy', () => {
       committer: { login: 'web-flow', id: 1000001 },
     }));
 
-    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+    const result = verifyWithPush(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain(
@@ -185,7 +212,7 @@ describe('verifyPolicy', () => {
       head: { ...pr.head, sha: commits[commits.length - 1].sha },
     };
 
-    const result = verifyPolicy(
+    const result = verifyWithPush(
       defaultInputs({ expectedId: 1000002, expectedWebFlowId: 1000003 }),
       ghesPr,
       commits,
@@ -213,7 +240,7 @@ describe('verifyPolicy', () => {
       committer: { login: 'web-flow', id: 19864447 },
     }));
 
-    const result = verifyPolicy(
+    const result = verifyWithPush(
       defaultInputs({ expectedId: 1000002, expectedWebFlowId: 1000003 }),
       ghesPr,
       spoofed,
@@ -234,7 +261,7 @@ describe('verifyPolicy', () => {
       },
     }));
 
-    const result = verifyPolicy(
+    const result = verifyWithPush(
       defaultInputs(),
       prEndingAt(modifiedCommits),
       modifiedCommits,
@@ -247,7 +274,7 @@ describe('verifyPolicy', () => {
   it('empty commits array fails with "no commits"', () => {
     const pr = loadFixture<PullRequest>('pr_dependabot.json');
 
-    const result = verifyPolicy(defaultInputs(), pr, []);
+    const result = verifyWithPush(defaultInputs(), pr, []);
 
     expect(result.verified).toBe(false);
     expect(result.reason.toLowerCase()).toContain('no commits');
@@ -262,7 +289,7 @@ describe('verifyPolicy', () => {
 
     expect(allCommits).toHaveLength(35);
 
-    const result = verifyPolicy(
+    const result = verifyWithPush(
       defaultInputs({ headSha: 'page2-commit-05' }),
       pr,
       allCommits,
@@ -279,7 +306,7 @@ describe('verifyPolicy', () => {
       i === 0 ? { ...c, author: { login: 'someone-else', id: c.author!.id } } : c,
     );
 
-    const result = verifyPolicy(defaultInputs(), pr, modifiedCommits);
+    const result = verifyWithPush(defaultInputs(), pr, modifiedCommits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('does not match');
@@ -294,7 +321,7 @@ describe('verifyPolicy', () => {
       sha: `commit-${String(i).padStart(3, '0')}`,
     }));
 
-    const result = verifyPolicy(defaultInputs(), pr, commits);
+    const result = verifyWithPush(defaultInputs(), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('API maximum');
@@ -315,7 +342,7 @@ describe('verifyPolicy', () => {
     ];
     const pr = prEndingAt(commits);
 
-    const result = verifyPolicy(defaultInputs({ headSha: 'abc123' }), pr, commits);
+    const result = verifyWithPush(defaultInputs({ headSha: 'abc123' }), pr, commits);
 
     expect(result.verified).toBe(false);
     expect(result.reason).toContain('null committer');

@@ -55,6 +55,8 @@ interface World {
   inputs: Record<string, string>;
   pr: Record<string, unknown> | null;
   commits: unknown[];
+  activity: unknown[];
+  activityError: Error | null;
   throwNonError: string | null;
 }
 
@@ -63,7 +65,14 @@ const originalEnv = { ...process.env };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  world = { inputs: {}, pr: null, commits: [], throwNonError: null };
+  world = {
+    inputs: {},
+    pr: null,
+    commits: [],
+    activity: [],
+    activityError: null,
+    throwNonError: null,
+  };
   process.env.GITHUB_SERVER_URL = 'https://github.com';
   process.env.GITHUB_API_URL = 'https://api.github.com';
 });
@@ -127,20 +136,28 @@ async function runAction(): Promise<void> {
           get: jest.fn().mockResolvedValue({ data: world.pr, headers }),
           listCommits: jest.fn().mockResolvedValue({ data: world.commits, headers }),
         };
-  mockGetOctokit.mockReturnValue({ rest: { pulls } });
+  const repos = {
+    listActivities:
+      world.activityError !== null
+        ? jest.fn().mockRejectedValue(world.activityError)
+        : jest.fn().mockResolvedValue({ data: world.activity, headers }),
+  };
+  mockGetOctokit.mockReturnValue({ rest: { pulls, repos } });
 
   await run();
 }
 
 const steps: StepDefinitions = ({ given, when, then }) => {
   // The PR every scenario starts from. Its head commit is the head.sha in
-  // pr_dependabot.json and the last commit in commits_verified.json.
+  // pr_dependabot.json, the last commit in commits_verified.json and the
+  // commit Dependabot's newest push to the branch ended at.
   given('a genuine Dependabot PR whose head commit is "def456"', () => {
     world.inputs['github-token'] = 'test-token';
     world.inputs['pr-number'] = '42';
     world.inputs['head-sha'] = 'def456';
     world.pr = loadFixture('pr_dependabot.json') as Record<string, unknown>;
     world.commits = loadFixture('commits_verified.json') as unknown[];
+    world.activity = loadFixture('activity_dependabot_push.json') as unknown[];
   });
 
   given(/^the "(.*)" input is "(.*)"$/, (name: string, value: string) => {
@@ -182,6 +199,33 @@ const steps: StepDefinitions = ({ given, when, then }) => {
       setField(commit as Record<string, unknown>, fieldPath, JSON.parse(value));
     }
   });
+
+  given(/^the repository activity API returns fixture "(.*)"$/, (name: string) => {
+    world.activity = loadFixture(name) as unknown[];
+  });
+
+  given('the repository activity API returns no entries', () => {
+    world.activity = [];
+  });
+
+  // What an endpoint the instance does not have answers, which is how older
+  // GitHub Enterprise Server releases respond.
+  given('the repository activity API responds with status 404', () => {
+    world.activityError = Object.assign(new Error('Not Found'), { status: 404 });
+  });
+
+  // The value is JSON, as for the PR field step. The first entry is the newest,
+  // because the endpoint lists activity newest first.
+  given(
+    /^the newest activity entry field "(.*)" is (.*)$/,
+    (fieldPath: string, value: string) => {
+      setField(
+        world.activity[0] as Record<string, unknown>,
+        fieldPath,
+        JSON.parse(value),
+      );
+    },
+  );
 
   given(/^the GitHub API throws a non-Error value "(.*)"$/, (value: string) => {
     world.throwNonError = value;

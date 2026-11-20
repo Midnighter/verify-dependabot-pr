@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The newest push to the pull request's head branch must have been made by
+  Dependabot and must have ended at the head commit being verified, read from
+  the repository's activity. Every other check reads a commit's own metadata,
+  and a squash merge defeats all of them at once: GitHub makes Dependabot the
+  author, signs the result as `web-flow`, and does so whatever commits the pull
+  request held, so someone with push access could squash-merge a Dependabot
+  pull request carrying their own change and force-push the signed result onto
+  another Dependabot branch. The same check rejects a branch pointed at an
+  older genuine Dependabot commit. It fails closed: an activity endpoint that
+  is not there, or a branch with no recorded push, refuses rather than passes.
+  The endpoint needs no permission beyond the `contents: read` the action
+  already required, and exists on GitHub Enterprise Server 3.19 and later.
 - A commit whose committer claims the login `web-flow` must also have that
   account's ID: 19864447 on GitHub.com, and on GitHub Enterprise Server the ID
   of the instance's own `web-flow` account, given in the new

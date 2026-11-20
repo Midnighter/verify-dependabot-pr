@@ -23,6 +23,8 @@ export interface PullRequest {
   };
   head: {
     sha: string;
+    /** The head branch's name, without the refs/heads/ prefix. */
+    ref: string;
     repo: {
       id: number;
       full_name: string;
@@ -57,6 +59,17 @@ export interface PullRequestCommit {
   };
   author: CommitUser | null;
   committer: CommitUser | null;
+}
+
+/**
+ * One entry from the repository activity endpoint, which records what moved a
+ * branch and who did it.
+ */
+export interface RepositoryActivity {
+  activity_type: string;
+  /** The commit the branch pointed at afterwards. */
+  after: string;
+  actor: CommitUser | null;
 }
 
 /** Result of the policy verification. */

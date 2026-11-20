@@ -8,12 +8,13 @@ Securely verify that a pull request is genuinely authored by Dependabot before a
 
 This action verifies that a PR was opened by the official Dependabot bot account
 (by login name, account type **and** numeric account ID), that every commit on it
-is a commit GitHub verified with Dependabot as its author, and that the result
-applies to the head commit the workflow ran for. It is a defence-in-depth
-control, not a cryptographic proof of supply chain integrity. An attacker who
-has already compromised GitHub's infrastructure or the Dependabot service itself
-is outside the threat model. Always review Dependabot PRs for unexpected
-dependency changes regardless of this action's result.
+is a commit GitHub verified with Dependabot as its author, that Dependabot is
+also who last pushed the head branch, and that the result applies to the head
+commit the workflow ran for. It is a defence-in-depth control, not a
+cryptographic proof of supply chain integrity. An attacker who has already
+compromised GitHub's infrastructure or the Dependabot service itself is outside
+the threat model. Always review Dependabot PRs for unexpected dependency
+changes regardless of this action's result.
 
 ## Quickstart
 
@@ -177,6 +178,12 @@ action needs both:
 > On GitHub.com neither input needs setting: both IDs are fixed, and the action
 > rejects any other value.
 
+The action also reads the repository's activity, to check that Dependabot is
+who last pushed the head branch. That endpoint exists on GitHub Enterprise
+Server 3.19 and later and needs no permission beyond `contents: read`. On an
+older instance it answers `404`, and the action fails rather than skip the
+check.
+
 ### Using outputs in subsequent steps
 
 Let later steps decide what to do instead of failing the job. Pass the outputs
@@ -230,7 +237,7 @@ permissions are required.
 
 ```yaml
 permissions:
-  contents: read # Read commits on the PR head branch.
+  contents: read # Read commits on the PR head branch, and who pushed it.
   pull-requests: read # Read PR author metadata.
 ```
 
@@ -256,18 +263,20 @@ and add the job as a required workflow under **Require workflows to pass**.
 
 This action is designed to prevent the following attack scenarios:
 
-| Scenario                                                                                                    | Mitigated? | How                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A person or another bot opens a PR under a name that looks like Dependabot's                                | Yes        | The PR author must be `dependabot[bot]`, of type `Bot`, with Dependabot's account ID.                                                                                                                          |
-| Attacker creates a bot account named `dependabot`                                                           | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.                                                                                                                                        |
-| Someone with push access adds or amends a commit on Dependabot's branch that names Dependabot as its author | Yes        | A commit counts only if GitHub verified its signature and its committer is `web-flow` or Dependabot, by account ID as well as login. A commit signed with a person's own key has that person as its committer. |
-| Commit pushed without a signature                                                                           | Yes        | Every commit must have a signature that GitHub verified.                                                                                                                                                       |
-| Commit whose author or committer has no GitHub account                                                      | Yes        | Commits with a null author or committer are rejected.                                                                                                                                                          |
-| PR from a fork                                                                                              | Yes        | Head and base must be the same repository, compared by ID.                                                                                                                                                     |
-| A commit is pushed while the workflow runs                                                                  | Yes        | The PR head must be the `head-sha` the workflow ran for and the last listed commit. Approve and merge only the `head-sha` output.                                                                              |
-| Pagination bypass — malicious commit on page 2+                                                             | Yes        | All commit pages are fetched, and their count must equal the PR's commit count.                                                                                                                                |
-| The token is sent to another host                                                                           | Yes        | The API URL is always the runner's own `GITHUB_API_URL`.                                                                                                                                                       |
-| Transient API failure causes a false pass                                                                   | Yes        | Exponential backoff retry; failures set `verified` to `false` and fail the step.                                                                                                                               |
+| Scenario                                                                                                                                       | Mitigated? | How                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A person or another bot opens a PR under a name that looks like Dependabot's                                                                   | Yes        | The PR author must be `dependabot[bot]`, of type `Bot`, with Dependabot's account ID.                                                                                                                                                                                           |
+| Attacker creates a bot account named `dependabot`                                                                                              | Yes        | Numeric account ID check; GitHub also reserves `[bot]` suffix accounts.                                                                                                                                                                                                         |
+| Someone with push access adds or amends a commit on Dependabot's branch that names Dependabot as its author                                    | Yes        | A commit counts only if GitHub verified its signature and its committer is `web-flow` or Dependabot, by account ID as well as login. A commit signed with a person's own key has that person as its committer.                                                                  |
+| Someone with push access squash-merges a Dependabot PR carrying their own change, then force-pushes the signed result onto a Dependabot branch | Yes        | GitHub makes Dependabot the author of a squash merge, signs it as `web-flow`, and does so whatever the PR held, so the commit's own metadata cannot give it away. The newest push to the head branch must therefore be Dependabot's, and must end at the commit being verified. |
+| Someone with push access points a Dependabot branch at an older genuine Dependabot commit, whose update has since been superseded              | Yes        | The newest push to the head branch must have ended at the head commit, so a branch moved to a commit pushed elsewhere is rejected.                                                                                                                                              |
+| Commit pushed without a signature                                                                                                              | Yes        | Every commit must have a signature that GitHub verified.                                                                                                                                                                                                                        |
+| Commit whose author or committer has no GitHub account                                                                                         | Yes        | Commits with a null author or committer are rejected.                                                                                                                                                                                                                           |
+| PR from a fork                                                                                                                                 | Yes        | Head and base must be the same repository, compared by ID.                                                                                                                                                                                                                      |
+| A commit is pushed while the workflow runs                                                                                                     | Yes        | The PR head must be the `head-sha` the workflow ran for and the last listed commit. Approve and merge only the `head-sha` output.                                                                                                                                               |
+| Pagination bypass — malicious commit on page 2+                                                                                                | Yes        | All commit pages are fetched, and their count must equal the PR's commit count.                                                                                                                                                                                                 |
+| The token is sent to another host                                                                                                              | Yes        | The API URL is always the runner's own `GITHUB_API_URL`.                                                                                                                                                                                                                        |
+| Transient API failure causes a false pass                                                                                                      | Yes        | Exponential backoff retry; failures set `verified` to `false` and fail the step.                                                                                                                                                                                                |
 
 This action does **not** protect against:
 
@@ -288,6 +297,15 @@ Check the `reason` output for the specific failure. Common causes:
   Dependabot_ — Someone rebased, amended or pushed to Dependabot's branch, so
   the commit is no longer Dependabot's. Comment `@dependabot recreate` on the PR
   to have Dependabot rebuild it.
+- _The newest push to the branch was made by someone else_ — The head commit may
+  look like Dependabot's and still have been put there by a person, which is
+  what this check is for. Read the diff before merging. If the push was
+  innocent, `@dependabot recreate` has Dependabot push the branch itself again.
+- _No push to the branch is recorded_ — The action could not establish who put
+  the head commit on the branch, so it refuses rather than assume. It reads the
+  repository's activity, which goes back a limited time, so a pull request left
+  open long enough for its last push to age out fails here. Comment
+  `@dependabot recreate` to give it a fresh one.
 - _The PR head is not the head commit that the workflow ran for_ — The PR
   changed while the workflow ran. The push that changed it starts a new run,
   which verifies the new head.
