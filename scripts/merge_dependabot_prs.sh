@@ -11,12 +11,17 @@
 #      (git push origin <sha>:refs/heads/main) - no merge commit, no squash,
 #      preserving dependabot's original signature.
 #
-# It does not check that the commits came from Dependabot. Two things already
-# do: this repository's own action, which runs on every PR, and your reading of
-# the diff before you call this script. The script deliberately keeps no copy
-# of the action's rules. A copy drifts from src/policy.ts - this one twice lost
-# rules the action had - and the machinery needed to stop it drifting costs
-# more than the convenience is worth.
+# It does not check that the commits came from Dependabot, and nothing else in
+# this repository does either: no workflow here runs this action on this
+# repository's own PRs, because an action cannot gate the PRs that change it.
+# So reading the diff before you call this script is the only authenticity
+# check in the merge path. Do that first.
+#
+# The script deliberately keeps no copy of the action's rules. A copy drifts
+# from src/policy.ts - this one twice lost rules the action had - and the
+# machinery needed to stop it drifting costs more than the convenience is
+# worth. If this repository ever wants the check in the merge path, the answer
+# is to use its own released action, not to re-implement it here.
 #
 # What it does check is mechanical, and independent of any review: that the PR
 # is an open, same-repository Dependabot PR targeting main, and that it

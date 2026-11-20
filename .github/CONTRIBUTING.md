@@ -134,13 +134,19 @@ models, such as the shape of a real commit message.
 requests you have already reviewed, so that Dependabot's own signed commits land
 unchanged. It is a convenience for merging several at once, not a gate.
 
-It deliberately does not check that the commits came from Dependabot. The action
-does that on every pull request, and you do it when you read the diff. The
-script once carried a copy of the action's rules in jq, and that copy twice lost
-rules `src/policy.ts` had gained; keeping the two in step needs more machinery
-than the convenience is worth. If this repository ever wants that check in the
-merge path, the right answer is to use its own released action rather than to
-re-implement it.
+It deliberately does not check that the commits came from Dependabot, and
+nothing else here does either: no workflow in this repository runs this action
+on this repository's own pull requests, because an action cannot gate the pull
+requests that change it. **Reading the diff is the only authenticity check in
+the merge path**, so review the pull request before you run the script. CI
+exercises the action against fixtures and against other pull requests of this
+repository, never against the one you are merging.
+
+The script once carried a copy of the action's rules in jq, and that copy twice
+lost rules `src/policy.ts` had gained; keeping the two in step needs more
+machinery than the convenience is worth. If this repository ever wants that
+check in the merge path, the right answer is to use its own released action
+rather than to re-implement it.
 
 What the script does check is mechanical, and holds whether or not a pull
 request was reviewed: that it is an open, same-repository Dependabot pull

@@ -12,11 +12,18 @@
 # It runs dist/index.js, not src/, so what it exercises is what consumers run:
 # input parsing, the real Octokit client, the policy and the step outputs.
 #
-# The anchors are merged pull requests. An open one moves, because Dependabot
-# rebases it and its head commit changes, so a case naming one would eventually
-# fail on its own. A merged pull request is frozen, and stays usable after its
-# head branch is deleted, because the policy compares head.repo.id and never
-# reads the branch.
+# The anchors are the newest merged Dependabot pull requests, chosen at run
+# time rather than written down here. A merged pull request is frozen, where an
+# open one moves as Dependabot rebases it, but a fixed list of them ages: the
+# policy reads who pushed the head branch from the repository's activity, which
+# goes back a limited time, so a named pull request would eventually be
+# rejected for being old and fail this check with nothing wrong in the code.
+# Selecting the newest few keeps the anchors inside that window for as long as
+# Dependabot opens pull requests at all.
+#
+# The selection asks only what the pull request is, never what the action makes
+# of it: merged, authored by Dependabot, targeting main. Dropping a pull
+# request because it fails would turn this check into a tautology.
 #
 # Needs a built dist/ (npm run build) and GH_TOKEN with read access to this
 # repository's contents and pull requests.
@@ -27,9 +34,20 @@ set -euo pipefail
 
 REPO="Midnighter/verify-dependabot-pr"
 
-# Merged Dependabot pull requests, each frozen at its head commit.
-VERIFIED_PRS=(98 97 96 94 93)
-# A pull request a person opened, which must not verify.
+# How many anchors to check, and the fewest that make the result mean
+# anything. Finding none must fail: a check that silently verifies nothing
+# reports success for the rest of the repository's life.
+ANCHOR_COUNT=5
+MIN_ANCHORS=3
+
+# Newest merged Dependabot pull requests first. The REST list is ordered by
+# creation, and Dependabot's rebases mean the two orders differ.
+readonly ANCHOR_FILTER='[.[] | select(.merged_at != null and .user.login == "dependabot[bot]")]
+  | sort_by(.merged_at) | reverse'
+
+# A pull request a person opened, which must not verify. Named rather than
+# selected, because a human pull request's verdict does not age: it is rejected
+# for its author, whatever the activity API still holds.
 REJECTED_PR=104
 
 # Every input's literal default from action.yml, as INPUT_* assignments, so that
@@ -103,8 +121,18 @@ check_pr() {
   rm -f "${outputs}" "${log}"
 }
 
+mapfile -t verified_prs < <(
+  gh api "repos/${REPO}/pulls?state=closed&base=main&per_page=100" \
+    --jq "${ANCHOR_FILTER} | .[0:${ANCHOR_COUNT}] | .[].number"
+)
+
+if ((${#verified_prs[@]} < MIN_ANCHORS)); then
+  echo "Found ${#verified_prs[@]} merged Dependabot PR(s) to check, need ${MIN_ANCHORS}." >&2
+  exit 2
+fi
+
 echo "Merged Dependabot PRs, which must verify:"
-for pr in "${VERIFIED_PRS[@]}"; do
+for pr in "${verified_prs[@]}"; do
   check_pr "${pr}" true
 done
 
