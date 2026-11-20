@@ -61,7 +61,7 @@ jobs:
     steps:
       - name: Verify Dependabot PR
         id: verify
-        uses: Midnighter/verify-dependabot-pr@0.3.0
+        uses: Midnighter/verify-dependabot-pr@0.4.0
 
   merge:
     permissions:
@@ -148,7 +148,7 @@ action needs both:
 ```yaml
 - name: Verify Dependabot PR
   id: verify
-  uses: Midnighter/verify-dependabot-pr@0.3.0
+  uses: Midnighter/verify-dependabot-pr@0.4.0
   with:
     expected-id: "1234" # Dependabot's account ID on your instance.
     expected-web-flow-id: "5678" # web-flow's account ID on your instance.
@@ -195,7 +195,7 @@ their content cannot run as shell code.
   id: verify
   # Later steps still run; verified is "false" on any failure.
   continue-on-error: true
-  uses: Midnighter/verify-dependabot-pr@0.3.0
+  uses: Midnighter/verify-dependabot-pr@0.4.0
 
 - name: Report verification result
   run: |
@@ -225,7 +225,7 @@ release workflow from a commit on `main`. Download the file at the release tag
 and verify it:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/Midnighter/verify-dependabot-pr/0.3.0/dist/index.js
+curl -fsSLO https://raw.githubusercontent.com/Midnighter/verify-dependabot-pr/0.4.0/dist/index.js
 gh attestation verify index.js --repo Midnighter/verify-dependabot-pr \
   --signer-workflow Midnighter/verify-dependabot-pr/.github/workflows/release.yml
 ```
