@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 #
-# Merges open, passing Dependabot PRs into main one at a time:
+# Fast-forwards main onto Dependabot PRs you have already reviewed, one at a
+# time, so that dependabot's own signed commits land unchanged:
 #
 #   1. Comment "@dependabot rebase" on the PR so its branch is rebased onto
 #      the current tip of main (dependabot re-signs the commit itself).
 #   2. Wait for dependabot to push the rebased commit and for required
 #      checks ("ci (24)", "ci (26)") to pass.
-#   3. Check every commit on the PR with the action's rules: verified,
-#      authored by Dependabot, committed by web-flow or Dependabot, and the
-#      last one is the commit that passed the checks.
-#
-#      These rules are a copy of the action's, not a call to it: the action
-#      verifies this repository's own Dependabot PRs only once it is built and
-#      released, so gating them on it would let a bad change to src/policy.ts
-#      block the PRs that fix it. They live in dependabot_commits.jq, and
-#      tests/unit/merge-script.test.ts fails when they and src/policy.ts
-#      disagree, so the copy cannot drift unnoticed.
-#   4. Approve that commit and fast-forward main to it
+#   3. Approve that commit and fast-forward main to it
 #      (git push origin <sha>:refs/heads/main) - no merge commit, no squash,
 #      preserving dependabot's original signature.
 #
+# It does not check that the commits came from Dependabot. Two things already
+# do: this repository's own action, which runs on every PR, and your reading of
+# the diff before you call this script. The script deliberately keeps no copy
+# of the action's rules. A copy drifts from src/policy.ts - this one twice lost
+# rules the action had - and the machinery needed to stop it drifting costs
+# more than the convenience is worth.
+#
+# What it does check is mechanical, and independent of any review: that the PR
+# is an open, same-repository Dependabot PR targeting main, and that it
+# approves and pushes the exact commit whose checks passed rather than wherever
+# the branch has moved to since.
+#
 # main's ruleset (id 17334798) requires linear history and signed commits;
-# a direct fast-forward push of an already-signed commit satisfies both.
-# The push goes through the admin bypass, so the script pushes the exact
-# commit it checked, never the branch, which may have moved since.
+# a direct fast-forward push of an already-signed commit satisfies both. The
+# push goes through the admin bypass, so main's required status checks do not
+# gate it. Review the PR before running this.
 #
 set -euo pipefail
 
@@ -39,33 +42,6 @@ REBASE_TIMEOUT=300 # seconds to wait for dependabot's rebase push
 REBASE_POLL=10     # seconds between polls
 CHECKS_TIMEOUT=120 # seconds to wait for CI runs to be registered after a push
 DEPENDABOT_ID=49699333
-WEB_FLOW_ID=19864447 # the account GitHub signs its own commits as
-MAX_COMMITS=250      # most commits the API lists for a PR; see src/types.ts
-
-COMMIT_FILTER="$(dirname "${BASH_SOURCE[0]}")/dependabot_commits.jq"
-
-# Applies the commit rules in dependabot_commits.jq to a commit list on stdin.
-# Separate from check_commits so that a test can feed it a fixture, and so the
-# rules live in one file shared with the test that compares them against
-# src/policy.ts.
-check_commit_list() {
-  local head=$1 total=$2
-  jq --exit-status --arg head "${head}" --argjson total "${total}" \
-    --argjson id "${DEPENDABOT_ID}" --argjson web_flow_id "${WEB_FLOW_ID}" \
-    --argjson max "${MAX_COMMITS}" \
-    --from-file "${COMMIT_FILTER}" >/dev/null
-}
-
-# Succeeds when the PR has at least one commit and fewer than the API's
-# maximum, the list holds every commit the PR claims, it ends at the given
-# SHA, and each commit is one GitHub verified with Dependabot as author and
-# web-flow or Dependabot as committer.
-check_commits() {
-  local pr=$1 head=$2 total
-  total=$(gh api "repos/${REPO}/pulls/${pr}" --jq .commits)
-  gh api --paginate --slurp "repos/${REPO}/pulls/${pr}/commits?per_page=100" |
-    check_commit_list "${head}" "${total}"
-}
 
 for pr in "${PR_NUMBERS[@]}"; do
   echo "== PR #${pr} =="
@@ -148,12 +124,8 @@ for pr in "${PR_NUMBERS[@]}"; do
     continue
   fi
 
-  if ! check_commits "${pr}" "${after_sha}"; then
-    echo "  skipping PR #${pr}: not every commit up to ${after_sha:0:7} is a verified Dependabot commit"
-    continue
-  fi
-
-  # Approve and push the checked commit, not wherever the branch points now.
+  # Approve and push the commit whose checks passed, not wherever the branch
+  # points now.
   gh api --method POST "repos/${REPO}/pulls/${pr}/reviews" \
     -f commit_id="${after_sha}" -f event=APPROVE --silent
 

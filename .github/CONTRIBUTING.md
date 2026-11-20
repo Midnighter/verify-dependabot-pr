@@ -125,24 +125,35 @@ models, such as the shape of a real commit message.
 
 ### The merge script
 
-`scripts/merge_dependabot_prs.sh` re-implements the commit rules in jq rather
-than calling the action, so that a bad change to `src/policy.ts` cannot block
-the pull requests that would fix it. Two checks keep that copy honest:
+`scripts/merge_dependabot_prs.sh` fast-forwards `main` onto Dependabot pull
+requests you have already reviewed, so that Dependabot's own signed commits land
+unchanged. It is a convenience for merging several at once, not a gate.
 
-- `tests/unit/merge-script.test.ts` runs the same fixtures through
-  `scripts/dependabot_commits.jq`, the filter the script itself runs, and
-  through `verifyPolicy`, and fails when the two disagree. A rule added to one
-  has to be added to the other.
-- `scripts/verify_merge_rules.sh` runs the script against crafted pull requests
-  with `gh` and `git` stubbed, checking which ones it merges and which it skips.
+It deliberately does not check that the commits came from Dependabot. The action
+does that on every pull request, and you do it when you read the diff. The
+script once carried a copy of the action's rules in jq, and that copy twice lost
+rules `src/policy.ts` had gained; keeping the two in step needs more machinery
+than the convenience is worth. If this repository ever wants that check in the
+merge path, the right answer is to use its own released action rather than to
+re-implement it.
+
+What the script does check is mechanical, and holds whether or not a pull
+request was reviewed: that it is an open, same-repository Dependabot pull
+request targeting `main`, and that it approves and pushes the exact commit whose
+checks passed rather than wherever the branch has moved to since. That matters
+because the push goes through the admin bypass, so `main`'s required status
+checks do not gate it.
+
+`scripts/verify_merge_script.sh` covers those decisions, running the script
+against crafted pull requests with `gh` and `git` stubbed, so it needs no token
+and can push nothing:
 
 ```bash
 npm run test:merge-script
 ```
 
-The drift test can only catch a difference that one of its cases distinguishes.
-When you add a rule, add a case where the two implementations would disagree
-without it; a rule no case exercises is a rule the test cannot police.
+Add a case when you add a guard. The most valuable ones are those where the
+script would push something other than the commit it checked.
 
 ## Code style
 
