@@ -1,4 +1,9 @@
-import { createClient, fetchAllCommits, fetchPullRequest } from '../../src/github';
+import {
+  createClient,
+  fetchAllCommits,
+  fetchNewestPush,
+  fetchPullRequest,
+} from '../../src/github';
 import * as core from '@actions/core';
 import { getOctokit } from '@actions/github';
 import type { PullRequest, PullRequestCommit } from '../../src/types';
@@ -16,6 +21,7 @@ function buildMockOctokit(opts: {
   prData?: PullRequest;
   listCommitsPages?: PullRequestCommit[][];
   listCommitsError?: Error;
+  activity?: unknown[];
   headers?: Record<string, string | number | undefined>;
 }) {
   let pageIndex = 0;
@@ -33,14 +39,21 @@ function buildMockOctokit(opts: {
 
   const mockGet = jest.fn().mockResolvedValue({ data: opts.prData, headers });
 
+  const mockListActivities = jest
+    .fn()
+    .mockResolvedValue({ data: opts.activity ?? [], headers });
+
   return {
     rest: {
       pulls: {
         get: mockGet,
         listCommits: mockListCommits,
       },
+      repos: {
+        listActivities: mockListActivities,
+      },
     },
-    _mocks: { mockGet, mockListCommits },
+    _mocks: { mockGet, mockListCommits, mockListActivities },
   };
 }
 
@@ -151,6 +164,101 @@ describe('fetchAllCommits', () => {
     // After page 3 (300 commits), 300 >= 250 so it breaks.
     expect(result).toHaveLength(300);
     expect(octokit._mocks.mockListCommits).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('fetchNewestPush', () => {
+  it('asks for the branch newest first and returns its newest push', async () => {
+    const activity = loadFixture<unknown[]>('activity_deleted_branch.json');
+    const octokit = buildMockOctokit({ activity }) as MockOctokit;
+
+    const result = await fetchNewestPush(octokit, 'owner', 'repo', 'feature');
+
+    // The newest entry of any kind is the branch deletion, which is not a push.
+    expect(result).toEqual({
+      activity_type: 'force_push',
+      ref: 'refs/heads/dependabot/npm_and_yarn/axios-0.21.4',
+      before: 'abc123',
+      after: 'def456',
+      timestamp: '2026-11-17T10:12:00Z',
+      actor: { login: 'dependabot[bot]', id: 49699333 },
+    });
+    expect(octokit._mocks.mockListActivities).toHaveBeenCalledWith({
+      owner: 'owner',
+      repo: 'repo',
+      ref: 'refs/heads/feature',
+      direction: 'desc',
+      per_page: 100,
+    });
+  });
+
+  it('counts a branch creation, which is the only push on a PR never rebased', async () => {
+    const octokit = buildMockOctokit({
+      activity: [
+        {
+          activity_type: 'branch_creation',
+          after: 'abc123',
+          actor: { login: 'dependabot[bot]', id: 49699333 },
+        },
+      ],
+    }) as MockOctokit;
+
+    const result = await fetchNewestPush(octokit, 'owner', 'repo', 'feature');
+
+    expect(result?.after).toBe('abc123');
+  });
+
+  it('returns null when the branch has no recorded activity', async () => {
+    const octokit = buildMockOctokit({ activity: [] }) as MockOctokit;
+
+    await expect(fetchNewestPush(octokit, 'owner', 'repo', 'feature')).resolves.toBe(
+      null,
+    );
+  });
+
+  it('returns null when no entry is a push', async () => {
+    const activity = loadFixture<unknown[]>('activity_no_push.json');
+    const octokit = buildMockOctokit({ activity }) as MockOctokit;
+
+    await expect(fetchNewestPush(octokit, 'owner', 'repo', 'feature')).resolves.toBe(
+      null,
+    );
+  });
+
+  it.each([
+    ['activity_type', { after: 'def456', actor: null }],
+    ['after', { activity_type: 'push', actor: null }],
+  ])('throws on an activity entry missing %s', async (_, entry) => {
+    const octokit = buildMockOctokit({ activity: [entry] }) as MockOctokit;
+
+    await expect(fetchNewestPush(octokit, 'owner', 'repo', 'feature')).rejects.toThrow(
+      'missing activity_type or after',
+    );
+  });
+
+  it.each([
+    ['no id', { login: 'dependabot[bot]' }],
+    ['no login', { id: 49699333 }],
+    ['nothing at all', undefined],
+  ])('throws on an activity entry whose actor has %s', async (_, actor) => {
+    const octokit = buildMockOctokit({
+      activity: [{ activity_type: 'push', after: 'def456', actor }],
+    }) as MockOctokit;
+
+    await expect(fetchNewestPush(octokit, 'owner', 'repo', 'feature')).rejects.toThrow(
+      'actor is incomplete',
+    );
+  });
+
+  it('accepts an entry whose actor GitHub could not name', async () => {
+    const octokit = buildMockOctokit({
+      activity: [{ activity_type: 'push', after: 'def456', actor: null }],
+    }) as MockOctokit;
+
+    const result = await fetchNewestPush(octokit, 'owner', 'repo', 'feature');
+
+    // The policy rejects it; reading the response is not where that happens.
+    expect(result?.actor).toBe(null);
   });
 });
 

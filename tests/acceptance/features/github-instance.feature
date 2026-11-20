@@ -28,6 +28,8 @@ Feature: Running on GitHub.com and on GitHub Enterprise Server
     Then the GitHub API client uses "https://ghes.example.com/api/v3"
     And the "verified" output is "true"
 
+  # The branch must also have been pushed by that instance's own Dependabot
+  # account, not by the account holding GitHub.com's ID.
   Scenario: On GHES a Dependabot account with its own ID passes
     Given the "GITHUB_SERVER_URL" environment variable is "https://ghes.example.com"
     And the "GITHUB_API_URL" environment variable is "https://ghes.example.com/api/v3"
@@ -35,6 +37,7 @@ Feature: Running on GitHub.com and on GitHub Enterprise Server
     And the "expected-web-flow-id" input is "1000003"
     And the PR field "user.id" is 1000002
     And the GitHub API returns commits fixture "commits_verified_ghes.json"
+    And the newest activity entry field "actor.id" is 1000002
     When the action runs
     Then the "verified" output is "true"
     And the action does not fail

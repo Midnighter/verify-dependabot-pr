@@ -1,6 +1,11 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { createClient, fetchPullRequest, fetchAllCommits } from './github';
+import {
+  createClient,
+  fetchPullRequest,
+  fetchAllCommits,
+  fetchNewestPush,
+} from './github';
 import {
   DEPENDABOT_ID_ON_GITHUB_COM,
   WEB_FLOW_ID_ON_GITHUB_COM,
@@ -96,7 +101,9 @@ export async function run(): Promise<void> {
 
     core.info(`Fetched ${commits.length} commit(s).`);
 
-    const result = verifyPolicy(inputs, pr, commits);
+    const newestPush = await fetchNewestPush(octokit, owner, repo, pr.head.ref);
+
+    const result = verifyPolicy(inputs, pr, commits, newestPush);
 
     core.setOutput('verified', String(result.verified));
     core.setOutput('reason', result.reason);
