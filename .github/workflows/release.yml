@@ -13,8 +13,11 @@ jobs:
   checks:
     # The same checks CI runs, as a gate before anything is built.
     uses: $/.github/workflows/checks.yml
+    # Must cover every permission the called workflow's jobs ask for: a job
+    # that asks for more than this fails the whole run before it starts.
     permissions:
       contents: read
+      pull-requests: read
 
   build:
     # Produces the bundle that gets attested and released, so it runs as little

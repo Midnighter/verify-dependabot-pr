@@ -13,5 +13,8 @@ jobs:
     # `$/` pins the called workflow to this workflow's own commit, so a pull
     # request runs the checks as that branch defines them.
     uses: $/.github/workflows/checks.yml
+    # Must cover every permission the called workflow's jobs ask for: a job
+    # that asks for more than this fails the whole run before it starts.
     permissions:
       contents: read
+      pull-requests: read
